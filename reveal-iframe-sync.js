@@ -153,6 +153,56 @@
     };
   }
 
+  function updateNavigationControls(ctx) {
+    const nav = buildNavigationStatus(ctx);
+    const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
+
+    // For instructors and standalone mode, enable all navigation.
+    if (isUnrestricted) {
+      ctx.deck.configure({
+        keyboard: true,
+        controls: true,
+        touch: true,
+      });
+      return;
+    }
+
+    // For students, enable navigation methods only for allowed directions.
+    // Use a keyboard map to selectively enable only permitted navigation keys.
+    const keyboardMap = {};
+
+    if (nav.canGoBack) {
+      keyboardMap[37] = 'left';   // left arrow
+      keyboardMap[72] = 'left';   // h
+      keyboardMap[33] = 'prev';   // page up
+      keyboardMap[38] = 'up';     // up arrow (for vertical slides)
+    }
+
+    if (nav.canGoForward) {
+      keyboardMap[39] = 'right';  // right arrow
+      keyboardMap[76] = 'right';  // l
+      keyboardMap[34] = 'next';   // page down
+      keyboardMap[32] = 'next';   // space
+      keyboardMap[40] = 'down';   // down arrow (for vertical slides)
+    }
+
+    // Always allow certain non-navigation keys.
+    keyboardMap[27] = 'null';     // escape (for exiting overlays)
+    keyboardMap[70] = 'null';     // f (fullscreen)
+
+    ctx.deck.configure({
+      // Enable keyboard only with the specific keys we've mapped.
+      keyboard: Object.keys(keyboardMap).length > 0 ? keyboardMap : false,
+
+      // Show controls, but let CSS handle disabling them if needed.
+      // RevealJS will grey them out based on available navigation.
+      controls: true,
+
+      // Enable touch only if any navigation is permitted.
+      touch: nav.canGoBack || nav.canGoForward,
+    });
+  }
+
   function buildSyncStatusPayload(ctx, reason) {
     return {
       reason: reason || 'status',
@@ -275,6 +325,9 @@
       }
     }
 
+    // Update navigation controls to reflect new boundary.
+    updateNavigationControls(ctx);
+
     safePostToParent(ctx, 'studentBoundaryChanged', {
       reason: options.reason || 'setStudentBoundary',
       studentBoundary: getStudentBoundary(ctx),
@@ -291,6 +344,10 @@
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
       detail: { indices: null },
     }));
+
+    // Update navigation controls to reflect cleared boundary.
+    updateNavigationControls(ctx);
+
     safePostToParent(ctx, 'studentBoundaryChanged', {
       reason: reason || 'clearBoundary',
       studentBoundary: null,
@@ -299,6 +356,9 @@
   }
 
   function enforceStudentNavigationBoundary(ctx) {
+    // This now acts as a safety net. The preventive control system (updateNavigationControls)
+    // should block navigation before it happens, but we keep this as a fallback for any
+    // edge cases where navigation might slip through (e.g., direct API calls, browser bugs).
     if (ctx.state.applyingRemote) return;
     if (ctx.state.role !== 'student') return;
     if (!ctx.state.studentMaxIndices) return;
@@ -440,6 +500,8 @@
               // Prevent student from drawing on the chalkboard canvas.
               callChalkboard(ctx, 'configure', [{ readOnly: true }]);
             }
+            // Update navigation controls to reflect new role.
+            updateNavigationControls(ctx);
             safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
             announceReady(ctx, 'roleChanged');
             if (ctx.state.role === 'instructor') {
@@ -548,6 +610,9 @@
 
     const enforceStudentBounds = () => {
       enforceStudentNavigationBoundary(ctx);
+      // Update controls after each navigation event to reflect current capabilities
+      // (e.g., when reaching the last slide, forward navigation should be disabled).
+      updateNavigationControls(ctx);
     };
 
     deck.on('slidechanged', enforceStudentBounds);
@@ -732,6 +797,9 @@
     wireWindowMessageListener(ctx);
     applyPauseLockUi(ctx);
 
+    // Initialize navigation controls based on starting role and capabilities.
+    updateNavigationControls(ctx);
+
     const api = {
       version: IFRAME_SYNC_VERSION,
       getRole: () => ctx.state.role,
@@ -748,6 +816,8 @@
             ctx.state.hasExplicitBoundary = false;
             ctx.state.boundaryIsLocal = false;
           }
+          // Update navigation controls to reflect new role.
+          updateNavigationControls(ctx);
           safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
           announceReady(ctx, 'apiSetRole');
         }
