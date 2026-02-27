@@ -165,29 +165,22 @@
       const blockForward = isStudent && !nav.canGoForward;
       const blockBack = isStudent && !nav.canGoBack;
 
-      const forwardButtons = [
-        controls.querySelector('.navigate-right'),
-        controls.querySelector('.navigate-down'),
-      ];
+      // Only lock left/right (horizontal navigation tied to boundaries).
+      // Up/down (vertical nested slides) are independent and RevealJS handles visibility.
+      const rightButton = controls.querySelector('.navigate-right');
+      const leftButton = controls.querySelector('.navigate-left');
 
-      const backButtons = [
-        controls.querySelector('.navigate-left'),
-        controls.querySelector('.navigate-up'),
-      ];
+      if (rightButton) {
+        rightButton.setAttribute('aria-disabled', blockForward ? 'true' : 'false');
+        rightButton.style.pointerEvents = blockForward ? 'none' : '';
+        rightButton.style.opacity = blockForward ? '0.18' : '';
+      }
 
-      forwardButtons.forEach((button) => {
-        if (!button) return;
-        button.setAttribute('aria-disabled', blockForward ? 'true' : 'false');
-        button.style.pointerEvents = blockForward ? 'none' : '';
-        button.style.opacity = blockForward ? '0.18' : '';
-      });
-
-      backButtons.forEach((button) => {
-        if (!button) return;
-        button.setAttribute('aria-disabled', blockBack ? 'true' : 'false');
-        button.style.pointerEvents = blockBack ? 'none' : '';
-        button.style.opacity = blockBack ? '0.18' : '';
-      });
+      if (leftButton) {
+        leftButton.setAttribute('aria-disabled', blockBack ? 'true' : 'false');
+        leftButton.style.pointerEvents = blockBack ? 'none' : '';
+        leftButton.style.opacity = blockBack ? '0.18' : '';
+      }
     };
 
     // For instructors and standalone mode, enable all navigation.
