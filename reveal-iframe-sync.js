@@ -213,8 +213,9 @@
       keyboardMap[40] = 'down';   // down arrow (for vertical slides)
     }
 
-    // Always allow certain non-navigation keys.
-    keyboardMap[27] = 'null';     // escape (for exiting overlays)
+    // Allow ESC but not for overview (map to 'null' to disable default ESC behavior).
+    // Students should not see the built-in grid overview as it bypasses boundaries.
+    keyboardMap[27] = 'null';     // escape (disable overview)
     keyboardMap[70] = 'null';     // f (fullscreen)
 
     ctx.deck.configure({
@@ -223,6 +224,10 @@
 
       // Enable touch only if any navigation is permitted.
       touch: nav.canGoBack || nav.canGoForward,
+
+      // Disable built-in grid overview for students to prevent viewing all slides
+      // at once (bypasses boundary controls). Students use custom storyboard instead.
+      overview: false,
     });
 
     applyArrowLocks();
