@@ -104,12 +104,62 @@
     return normalizeIndices(ctx.state.studentMaxIndices);
   }
 
+  function getLinearRoutes(deck) {
+    const hasPrev = (typeof deck.hasPrevious === 'function')
+      ? !!deck.hasPrevious()
+      : true;
+    const hasNext = (typeof deck.hasNext === 'function')
+      ? !!deck.hasNext()
+      : true;
+    return { hasPrev, hasNext };
+  }
+
+  function buildNavigationStatus(ctx) {
+    const current = normalizeIndices(ctx.deck.getIndices());
+    const roleCaps = getRoleCapabilities(ctx);
+    const studentBoundary = getStudentBoundary(ctx);
+    const { hasPrev, hasNext } = getLinearRoutes(ctx.deck);
+
+    let minIndices = null;
+    let maxIndices = null;
+
+    // For students, the boundary acts as a hard max. If back nav is disabled,
+    // that same boundary also acts as an effective min (cannot move away from it).
+    if (ctx.state.role === 'student' && studentBoundary) {
+      if (!roleCaps.canNavigateForward || ctx.state.hasExplicitBoundary) {
+        maxIndices = studentBoundary;
+      }
+      if (!roleCaps.canNavigateBack) {
+        minIndices = studentBoundary;
+      }
+    }
+
+    let canGoBack = roleCaps.canNavigateBack && hasPrev;
+    let canGoForward = roleCaps.canNavigateForward && hasNext;
+
+    if (minIndices) {
+      canGoBack = canGoBack && compareIndices(current, minIndices) > 0;
+    }
+    if (maxIndices) {
+      canGoForward = canGoForward && compareIndices(current, maxIndices) < 0;
+    }
+
+    return {
+      current,
+      minIndices,
+      maxIndices,
+      canGoBack,
+      canGoForward,
+    };
+  }
+
   function buildSyncStatusPayload(ctx, reason) {
     return {
       reason: reason || 'status',
       role: ctx.state.role,
       capabilities: getRoleCapabilities(ctx),
       studentBoundary: getStudentBoundary(ctx),
+      navigation: buildNavigationStatus(ctx),
       // True when this iframe set the boundary locally (via the storyboard
       // boundary button) rather than receiving it from the host. Lets the
       // storyboard skip forward-navigation restrictions for the acting instructor.
