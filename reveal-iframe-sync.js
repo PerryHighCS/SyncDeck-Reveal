@@ -216,6 +216,7 @@
     // Allow ESC but not for overview (map to 'null' to disable default ESC behavior).
     // Students should not see the built-in grid overview as it bypasses boundaries.
     keyboardMap[27] = 'null';     // escape (disable overview)
+    keyboardMap[79] = 'null';     // o (disable overview)
     keyboardMap[70] = 'null';     // f (fullscreen)
 
     ctx.deck.configure({
