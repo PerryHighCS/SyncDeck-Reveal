@@ -156,15 +156,11 @@
   function updateNavigationControls(ctx) {
     const nav = buildNavigationStatus(ctx);
     const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
-    // Use the original controls configuration from the presentation.
-    // We manage keyboard/touch navigation but respect the user's controls visibility choice.
-    const controlsEnabled = ctx.state.originalControls;
 
     // For instructors and standalone mode, enable all navigation.
     if (isUnrestricted) {
       ctx.deck.configure({
         keyboard: true,
-        controls: controlsEnabled,
         touch: true,
       });
       return;
@@ -196,10 +192,6 @@
     ctx.deck.configure({
       // Enable keyboard only with the specific keys we've mapped.
       keyboard: Object.keys(keyboardMap).length > 0 ? keyboardMap : false,
-
-    // Respect the original controls setting from the presentation.
-    // RevealJS will grey out individual arrows based on available navigation.
-    controls: controlsEnabled,
 
       // Enable touch only if any navigation is permitted.
       touch: nav.canGoBack || nav.canGoForward,
@@ -793,8 +785,6 @@
         studentMaxIndices: titleSlideBoundary(),  // default: title slide until instructor progresses
         hasExplicitBoundary: false,  // true once allowStudentForwardTo/setStudentBoundary received
         boundaryIsLocal: false,      // true when boundary was set by storyboard button (acting instructor)
-        // Capture the original controls setting so we can preserve it when reconfiguring.
-        originalControls: deck.getConfig().controls !== false,
       },
     };
 
