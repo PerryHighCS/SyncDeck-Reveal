@@ -157,12 +157,47 @@
     const nav = buildNavigationStatus(ctx);
     const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
 
+    const applyArrowLocks = () => {
+      const controls = document.querySelector('.reveal .controls');
+      if (!controls) return;
+
+      const isStudent = ctx.state.role === 'student';
+      const blockForward = isStudent && !nav.canGoForward;
+      const blockBack = isStudent && !nav.canGoBack;
+
+      const forwardButtons = [
+        controls.querySelector('.navigate-right'),
+        controls.querySelector('.navigate-down'),
+      ];
+
+      const backButtons = [
+        controls.querySelector('.navigate-left'),
+        controls.querySelector('.navigate-up'),
+      ];
+
+      forwardButtons.forEach((button) => {
+        if (!button) return;
+        button.setAttribute('aria-disabled', blockForward ? 'true' : 'false');
+        button.style.pointerEvents = blockForward ? 'none' : '';
+        button.style.opacity = blockForward ? '0.18' : '';
+      });
+
+      backButtons.forEach((button) => {
+        if (!button) return;
+        button.setAttribute('aria-disabled', blockBack ? 'true' : 'false');
+        button.style.pointerEvents = blockBack ? 'none' : '';
+        button.style.opacity = blockBack ? '0.18' : '';
+      });
+    };
+
     // For instructors and standalone mode, enable all navigation.
     if (isUnrestricted) {
       ctx.deck.configure({
         keyboard: true,
         touch: true,
       });
+      applyArrowLocks();
+      requestAnimationFrame(applyArrowLocks);
       return;
     }
 
@@ -196,6 +231,9 @@
       // Enable touch only if any navigation is permitted.
       touch: nav.canGoBack || nav.canGoForward,
     });
+
+    applyArrowLocks();
+    requestAnimationFrame(applyArrowLocks);
   }
 
   function buildSyncStatusPayload(ctx, reason) {
