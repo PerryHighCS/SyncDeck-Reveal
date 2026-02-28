@@ -352,8 +352,8 @@
       // Enable keyboard only with the specific keys we've mapped.
       keyboard: Object.keys(keyboardMap).length > 0 ? keyboardMap : false,
 
-      // Enable touch only if any navigation is permitted.
-      touch: nav.canGoBack || nav.canGoForward,
+      // Enable touch if any horizontal or vertical navigation is permitted.
+      touch: nav.canGoBack || nav.canGoForward || nav.canGoUp || nav.canGoDown,
 
       // Disable built-in grid overview for students to prevent viewing all slides
       // at once (bypasses boundary controls). Students use custom storyboard instead.

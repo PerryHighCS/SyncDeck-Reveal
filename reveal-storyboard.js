@@ -20,6 +20,12 @@
     return text.replace(/\s+/g, ' ');
   }
 
+  function getStackChildLabel(section, hIndex, vIndex) {
+    const heading = section.querySelector('h1, h2, h3');
+    const text = heading ? heading.textContent.trim() : `Slide ${hIndex + 1}.${vIndex + 1}`;
+    return text.replace(/\s+/g, ' ');
+  }
+
   function createSlidePreview(section) {
     const sectionClone = section.cloneNode(true);
     sectionClone.classList.remove('past', 'future', 'stack');
@@ -372,8 +378,9 @@
             childButton.dataset.slideH = String(entry.h);
             childButton.dataset.slideV = String(v);
             childButton.textContent = String(v + 1);
-            childButton.title = getSlideLabel(childSection, entry.h);
-            childButton.setAttribute('aria-label', `Go to ${getSlideLabel(childSection, entry.h)}`);
+            const childLabel = getStackChildLabel(childSection, entry.h, v);
+            childButton.title = childLabel;
+            childButton.setAttribute('aria-label', `Go to ${childLabel}`);
             childButton.addEventListener('click', (event) => {
               event.stopPropagation();
               reveal.slide(entry.h, v);
@@ -398,7 +405,7 @@
             // Toggle: clicking the active boundary slide clears it.
             const isClear = currentBoundaryIndex === entry.h;
             window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-moved', {
-              detail: isClear ? { indices: null } : { indices: { h: entry.h, v: 0, f: 0 } },
+              detail: isClear ? { indices: null } : { indices: { h: entry.h, v: 0, f: -1 } },
             }));
           });
           wrap.appendChild(boundaryBtn);
