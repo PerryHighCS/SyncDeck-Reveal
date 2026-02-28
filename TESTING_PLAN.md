@@ -116,3 +116,5 @@ added:
 - No-back mode with vertical `up` available.
 - Instructor storyboard refreshes after boundary changes and role changes.
 - Student touch interactions on mobile or responsive emulation.
+
+Checklist file: `test/MANUAL_REGRESSION_CHECKLIST.md`
