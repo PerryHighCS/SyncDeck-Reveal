@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncDeck Iframe Host Harness</title>
+</head>
+<body>
+  <iframe id="deck-frame" title="SyncDeck deck under test"></iframe>
+
+  <script>
+    const messages = [];
+    const frame = document.getElementById('deck-frame');
+    const params = new URLSearchParams(window.location.search);
+    const frameSrc = params.get('src') || './runtime-harness.html';
+
+    window.addEventListener('message', (event) => {
+      messages.push({
+        origin: event.origin,
+        data: event.data,
+      });
+    });
+
+    window.__hostHarness = {
+      get frame() {
+        return frame;
+      },
+      getMessages() {
+        return messages.slice();
+      },
+      clearMessages() {
+        messages.length = 0;
+      },
+      postCommand(name, payload = {}) {
+        frame.contentWindow.postMessage({
+          type: 'reveal-sync',
+          action: 'command',
+          deckId: 'fixture-deck',
+          payload: {
+            name,
+            payload,
+          },
+        }, '*');
+      },
+      requestState() {
+        frame.contentWindow.postMessage({
+          type: 'reveal-sync',
+          action: 'requestState',
+          deckId: 'fixture-deck',
+          payload: {},
+        }, '*');
+      },
+    };
+
+    frame.src = frameSrc;
+  </script>
+</body>
+</html>
