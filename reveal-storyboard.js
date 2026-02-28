@@ -209,15 +209,24 @@
       });
     }
 
-    function updateBoundaryMarker(index) {
-      currentBoundaryIndex = (index != null && Number.isFinite(Number(index)))
+    function updateBoundaryMarker(index, options = {}) {
+      const nextBoundaryIndex = (index != null && Number.isFinite(Number(index)))
         ? Number(index)
         : null;
+      const boundaryChanged = nextBoundaryIndex !== currentBoundaryIndex;
+
+      currentBoundaryIndex = nextBoundaryIndex;
 
       applyStoryboardRangeClasses();
 
-      if (currentBoundaryIndex !== null && liveRegion) {
+      if (options.announce === false || !boundaryChanged || !liveRegion) {
+        return;
+      }
+
+      if (currentBoundaryIndex !== null) {
         liveRegion.textContent = `Student boundary set to slide ${currentBoundaryIndex + 1}`;
+      } else {
+        liveRegion.textContent = 'Student boundary cleared';
       }
     }
 
@@ -451,7 +460,9 @@
       updateReleasedRange(getReleasedRange(status));
 
       // Reapply boundary marker after re-render (handles role-change refreshes).
-      if (currentBoundaryIndex !== null) updateBoundaryMarker(currentBoundaryIndex);
+      if (currentBoundaryIndex !== null) {
+        updateBoundaryMarker(currentBoundaryIndex, { announce: false });
+      }
     }
 
     function updateStoryboardActive(indices) {

@@ -484,9 +484,10 @@
     // storyboard can skip forward-restriction for the acting instructor.
     ctx.state.boundaryIsLocal = !!options.localBoundary;
 
+    const isPastRequestedBoundary = compareIndices(current, requestedBoundary) > 0;
     const shouldExactLock = !options.localBoundary
       && ctx.state.role === 'student'
-      && current.h > nextBoundary.h;
+      && isPastRequestedBoundary;
     ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
     const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
     let lastAllowedTarget = current;
@@ -503,7 +504,7 @@
         lastAllowedTarget = snapTarget;
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
-        if (current.h > nextBoundary.h) {
+        if (isPastRequestedBoundary) {
           ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
           lastAllowedTarget = snapTarget;
         }
