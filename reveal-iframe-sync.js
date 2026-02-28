@@ -102,7 +102,16 @@
     return {
       h: Number(indices?.h ?? 0),
       v: Number(indices?.v ?? 0),
-      f: Number(indices?.f ?? 0),
+      f: Number(indices?.f ?? -1),
+    };
+  }
+
+  function normalizeBoundaryIndices(indices) {
+    const next = normalizeIndices(indices);
+    return {
+      h: next.h,
+      v: 0,
+      f: -1,
     };
   }
 
@@ -126,24 +135,61 @@
 
   function getStudentBoundary(ctx) {
     if (!ctx.state.studentMaxIndices) return null;
-    return normalizeIndices(ctx.state.studentMaxIndices);
+    if (ctx.state.role !== 'student' && !ctx.state.hasExplicitBoundary) return null;
+    return normalizeBoundaryIndices(ctx.state.studentMaxIndices);
   }
 
-  function getLinearRoutes(deck) {
-    const hasPrev = (typeof deck.hasPrevious === 'function')
-      ? !!deck.hasPrevious()
-      : true;
-    const hasNext = (typeof deck.hasNext === 'function')
-      ? !!deck.hasNext()
-      : true;
-    return { hasPrev, hasNext };
+  function getDirectionalRoutes(deck) {
+    const routes = (typeof deck.availableRoutes === 'function')
+      ? (deck.availableRoutes() || {})
+      : {};
+    return {
+      hasLeft: !!routes.left,
+      hasRight: !!routes.right,
+      hasUp: !!routes.up,
+      hasDown: !!routes.down,
+    };
+  }
+
+  function hasForwardFragmentStep(deck) {
+    const currentSlide = deck.getCurrentSlide?.();
+    if (!currentSlide) return false;
+    return !!currentSlide.querySelector('.fragment:not(.visible)');
+  }
+
+  function hasBackwardFragmentStep(deck) {
+    const current = normalizeIndices(deck.getIndices());
+    return current.f > -1;
+  }
+
+  function buildReleasedRegion(ctx) {
+    // releaseStartH/releaseEndH stay null until a boundary is captured or
+    // explicitly applied. Only emit a released region when the iframe is
+    // actively tracking a student boundary (student follow mode or an explicit
+    // boundary).
+    const hasActiveReleasedRegion = ctx.state.role === 'student' || ctx.state.hasExplicitBoundary;
+    if (!hasActiveReleasedRegion) {
+      return null;
+    }
+
+    if (!Number.isFinite(ctx.state.releaseStartH) || !Number.isFinite(ctx.state.releaseEndH)) {
+      return null;
+    }
+
+    return {
+      startH: ctx.state.releaseStartH,
+      endH: ctx.state.releaseEndH,
+    };
   }
 
   function buildNavigationStatus(ctx) {
     const current = normalizeIndices(ctx.deck.getIndices());
     const roleCaps = getRoleCapabilities(ctx);
     const studentBoundary = getStudentBoundary(ctx);
-    const { hasPrev, hasNext } = getLinearRoutes(ctx.deck);
+    const exactStudentBoundary = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
+    const routes = getDirectionalRoutes(ctx.deck);
 
     let minIndices = null;
     let maxIndices = null;
@@ -159,14 +205,63 @@
       }
     }
 
-    let canGoBack = roleCaps.canNavigateBack && hasPrev;
-    let canGoForward = roleCaps.canNavigateForward && hasNext;
+    const inFollowInstructorMode = !ctx.state.hasExplicitBoundary;
+    const allowBackward = roleCaps.canNavigateBack;
+    const allowForward = ctx.state.role === 'student'
+      ? (ctx.state.hasExplicitBoundary || roleCaps.canNavigateForward)
+      : roleCaps.canNavigateForward;
+    const hasBackwardFragment = hasBackwardFragmentStep(ctx.deck);
+    const hasForwardFragment = hasForwardFragmentStep(ctx.deck);
 
-    if (minIndices) {
-      canGoBack = canGoBack && compareIndices(current, minIndices) > 0;
-    }
-    if (maxIndices) {
-      canGoForward = canGoForward && compareIndices(current, maxIndices) < 0;
+    // Treat Reveal prev/next as generic linear progression, which includes
+    // fragments and vertical stack movement. Keep left/right separate so
+    // horizontal controls can still honor horizontal boundaries exactly.
+    let canGoBack = allowBackward && (routes.hasLeft || routes.hasUp || hasBackwardFragment);
+    let canGoForward = allowForward && (routes.hasRight || routes.hasDown || hasForwardFragment);
+    let canGoLeft = allowBackward && routes.hasLeft;
+    let canGoRight = allowForward && routes.hasRight;
+    let canGoUp = allowBackward && routes.hasUp;
+    let canGoDown = allowForward && routes.hasDown;
+
+    if (ctx.state.role === 'student' && studentBoundary) {
+      const boundaryH = studentBoundary.h;
+
+      if (minIndices) {
+        if (current.h < boundaryH) {
+          canGoBack = false;
+          canGoLeft = false;
+          canGoUp = false;
+        } else if (current.h === boundaryH) {
+          canGoBack = canGoBack && (routes.hasUp || hasBackwardFragment);
+          canGoLeft = false;
+          canGoUp = canGoUp && routes.hasUp;
+        }
+      }
+
+      if (maxIndices) {
+        if (current.h > boundaryH) {
+          canGoForward = false;
+          canGoRight = false;
+          canGoDown = false;
+        } else if (current.h === boundaryH) {
+          canGoForward = canGoForward && (routes.hasDown || hasForwardFragment);
+          canGoRight = false;
+          canGoDown = canGoDown && routes.hasDown;
+        }
+      }
+
+      if (inFollowInstructorMode && maxIndices && current.h >= boundaryH) {
+        canGoForward = false;
+        canGoRight = false;
+        canGoDown = false;
+      }
+
+      if (exactStudentBoundary && current.h === exactStudentBoundary.h) {
+        if (compareIndices(current, exactStudentBoundary) >= 0) {
+          canGoForward = false;
+          canGoDown = false;
+        }
+      }
     }
 
     return {
@@ -175,6 +270,10 @@
       maxIndices,
       canGoBack,
       canGoForward,
+      canGoLeft,
+      canGoRight,
+      canGoUp,
+      canGoDown,
     };
   }
 
@@ -189,8 +288,8 @@
       if (!controls) return;
 
       const isStudent = ctx.state.role === 'student';
-      const blockForward = isStudent && !nav.canGoForward;
-      const blockBack = isStudent && !nav.canGoBack;
+      const blockForward = isStudent && !nav.canGoRight;
+      const blockBack = isStudent && !nav.canGoLeft;
 
       // Only lock left/right (horizontal navigation tied to boundaries).
       // Up/down (vertical nested slides) are independent and RevealJS handles visibility.
@@ -231,18 +330,30 @@
     // Use a keyboard map to selectively enable only permitted navigation keys.
     const keyboardMap = {};
 
-    if (nav.canGoBack) {
+    if (nav.canGoLeft) {
       keyboardMap[37] = 'left';   // left arrow
       keyboardMap[72] = 'left';   // h
+    }
+
+    if (nav.canGoBack) {
       keyboardMap[33] = 'prev';   // page up
-      keyboardMap[38] = 'up';     // up arrow (for vertical slides)
+    }
+
+    if (nav.canGoRight) {
+      keyboardMap[39] = 'right';  // right arrow
+      keyboardMap[76] = 'right';  // l
     }
 
     if (nav.canGoForward) {
-      keyboardMap[39] = 'right';  // right arrow
-      keyboardMap[76] = 'right';  // l
       keyboardMap[34] = 'next';   // page down
       keyboardMap[32] = 'next';   // space
+    }
+
+    if (nav.canGoUp) {
+      keyboardMap[38] = 'up';     // up arrow (for vertical slides)
+    }
+
+    if (nav.canGoDown) {
       keyboardMap[40] = 'down';   // down arrow (for vertical slides)
     }
 
@@ -256,8 +367,8 @@
       // Enable keyboard only with the specific keys we've mapped.
       keyboard: Object.keys(keyboardMap).length > 0 ? keyboardMap : false,
 
-      // Enable touch only if any navigation is permitted.
-      touch: nav.canGoBack || nav.canGoForward,
+      // Enable touch if any horizontal or vertical navigation is permitted.
+      touch: nav.canGoBack || nav.canGoForward || nav.canGoUp || nav.canGoDown,
 
       // Disable built-in grid overview for students to prevent viewing all slides
       // at once (bypasses boundary controls). Students use custom storyboard instead.
@@ -274,6 +385,7 @@
       role: ctx.state.role,
       capabilities: getRoleCapabilities(ctx),
       studentBoundary: getStudentBoundary(ctx),
+      releasedRegion: buildReleasedRegion(ctx),
       navigation: buildNavigationStatus(ctx),
       // True when this iframe set the boundary locally (via the storyboard
       // boundary button) rather than receiving it from the host. Lets the
@@ -336,6 +448,79 @@
     };
   }
 
+  function stopGestureEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  function createTouchGestureBlocker(ctx) {
+    const SWIPE_THRESHOLD_PX = 12;
+
+    return {
+      onTouchStart(event) {
+        if (ctx.state.role !== 'student') return;
+        if (ctx.state.pauseLockedByHost) return;
+        if (event.touches.length !== 1) {
+          ctx.state.touchGesture = null;
+          return;
+        }
+        const touch = event.touches[0];
+        ctx.state.touchGesture = {
+          id: touch.identifier,
+          startX: touch.clientX,
+          startY: touch.clientY,
+          handled: false,
+        };
+      },
+
+      onTouchMove(event) {
+        const gesture = ctx.state.touchGesture;
+        if (!gesture || gesture.handled) return;
+        if (ctx.state.role !== 'student' || ctx.state.pauseLockedByHost) return;
+
+        const touch = Array.from(event.touches).find((entry) => entry.identifier === gesture.id);
+        if (!touch) return;
+
+        const deltaX = touch.clientX - gesture.startX;
+        const deltaY = touch.clientY - gesture.startY;
+        if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) <= Math.abs(deltaY)) {
+          return;
+        }
+
+        const nav = buildNavigationStatus(ctx);
+        const isForwardSwipe = deltaX < 0;
+        const canUseHorizontalRoute = isForwardSwipe ? nav.canGoRight : nav.canGoLeft;
+        const canUseFragmentStep = isForwardSwipe
+          ? (nav.canGoForward && hasForwardFragmentStep(ctx.deck))
+          : (nav.canGoBack && hasBackwardFragmentStep(ctx.deck));
+
+        if (canUseHorizontalRoute) {
+          return;
+        }
+
+        stopGestureEvent(event);
+        gesture.handled = true;
+
+        if (!canUseFragmentStep) {
+          return;
+        }
+
+        if (isForwardSwipe) {
+          ctx.deck.next?.();
+        } else {
+          ctx.deck.prev?.();
+        }
+      },
+
+      onTouchEnd() {
+        ctx.state.touchGesture = null;
+      },
+    };
+  }
+
   function applyPauseLockUi(ctx) {
     const shouldLock = ctx.state.role === 'student' && !!ctx.state.pauseLockedByHost;
     const overlay = ensurePauseOverlay(ctx);
@@ -353,7 +538,20 @@
   }
 
   function captureStudentBoundary(ctx) {
-    ctx.state.studentMaxIndices = normalizeIndices(ctx.deck.getIndices());
+    const current = normalizeIndices(ctx.deck.getIndices());
+    const boundary = normalizeBoundaryIndices(current);
+    ctx.state.studentMaxIndices = boundary;
+    // In follow-instructor mode with forward navigation disabled, the captured
+    // instructor position acts as an exact safety-net max. UI controls already
+    // suppress same-h down/fragment advance, but keeping the precise synced
+    // indices here lets enforceStudentNavigationBoundary snap back if touch or
+    // direct API calls move the student deeper within the current stack.
+    ctx.state.exactStudentMaxIndices = ctx.config.studentCanNavigateForward
+      ? null
+      : current;
+    ctx.state.lastAllowedStudentIndices = current;
+    ctx.state.releaseStartH = boundary.h;
+    ctx.state.releaseEndH = boundary.h;
   }
 
   /** Default boundary for a student before the instructor has progressed. */
@@ -364,13 +562,35 @@
   function setStudentBoundary(ctx, indices, options = {}) {
     if (!indices) return false;
 
-    const nextBoundary = normalizeIndices(indices);
+    const requestedBoundary = normalizeIndices(indices);
+    const nextBoundary = normalizeBoundaryIndices(requestedBoundary);
+    const current = normalizeIndices(ctx.deck.getIndices());
     ctx.state.studentMaxIndices = nextBoundary;
     ctx.state.hasExplicitBoundary = true;
+    const releaseStartH = Number.isFinite(Number(options.releaseStartH))
+      ? Number(options.releaseStartH)
+      : normalizeIndices(ctx.deck.getIndices()).h;
+    ctx.state.releaseStartH = Math.min(releaseStartH, nextBoundary.h);
+    ctx.state.releaseEndH = Math.max(releaseStartH, nextBoundary.h);
 
     // Track whether this boundary originated locally (storyboard button) so the
     // storyboard can skip forward-restriction for the acting instructor.
     ctx.state.boundaryIsLocal = !!options.localBoundary;
+
+    // Compare against the full requested position here rather than the
+    // canonicalized horizontal boundary. This is the one place where a
+    // same-h pullback should count as "past" so the student can be snapped
+    // back to the instructor's exact current location (including the canonical
+    // root position { h, v: 0, f: -1 } when the instructor is at the top of a
+    // stack / fragment sequence). Normal boundary storage and steady-state
+    // navigation enforcement remain horizontal-only via nextBoundary.
+    const isPastRequestedBoundary = compareIndices(current, requestedBoundary) > 0;
+    const shouldExactLock = !options.localBoundary
+      && ctx.state.role === 'student'
+      && isPastRequestedBoundary;
+    ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
+    const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
+    let lastAllowedTarget = current;
 
     // Notify the storyboard so it can display the boundary marker for all roles.
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
@@ -380,15 +600,21 @@
     if (ctx.state.role === 'student') {
       if (options.syncToBoundary) {
         // Jump student to the boundary slide.
-        ctx.deck.slide(nextBoundary.h, nextBoundary.v, nextBoundary.f);
+        ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
+        lastAllowedTarget = snapTarget;
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
-        const current = normalizeIndices(ctx.deck.getIndices());
-        if (compareIndices(current, nextBoundary) > 0) {
-          ctx.deck.slide(nextBoundary.h, nextBoundary.v, nextBoundary.f);
+        if (isPastRequestedBoundary) {
+          ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
+          lastAllowedTarget = snapTarget;
         }
       }
     }
+
+    // Reset the allowed-position cache for each explicit boundary session so a
+    // later snap-back cannot reuse a stale v/f location from an older boundary
+    // on the same horizontal slide.
+    ctx.state.lastAllowedStudentIndices = normalizeIndices(lastAllowedTarget);
 
     // Update navigation controls to reflect new boundary.
     updateNavigationControls(ctx);
@@ -406,6 +632,10 @@
     ctx.state.studentMaxIndices = null;
     ctx.state.hasExplicitBoundary = false;
     ctx.state.boundaryIsLocal = false;
+    ctx.state.exactStudentMaxIndices = null;
+    ctx.state.lastAllowedStudentIndices = null;
+    ctx.state.releaseStartH = null;
+    ctx.state.releaseEndH = null;
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
       detail: { indices: null },
     }));
@@ -429,8 +659,13 @@
     if (!ctx.state.studentMaxIndices) return;
 
     const current = normalizeIndices(ctx.deck.getIndices());
-    const max = normalizeIndices(ctx.state.studentMaxIndices);
-    const delta = compareIndices(current, max);
+    const max = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
+    const lastAllowed = ctx.state.lastAllowedStudentIndices
+      ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
+      : null;
+    const exactMax = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
 
     const canGoBack = !!ctx.config.studentCanNavigateBack;
     // An explicit boundary (allowStudentForwardTo / setStudentBoundary) always
@@ -441,14 +676,23 @@
       : !!ctx.config.studentCanNavigateForward;
 
     let shouldReset = false;
-    if (!canGoForward && delta > 0) shouldReset = true;
-    if (!canGoBack && delta < 0) shouldReset = true;
+    if (!canGoForward && current.h > max.h) shouldReset = true;
+    if (!canGoBack && current.h < max.h) shouldReset = true;
+    if (!canGoBack && lastAllowed && compareIndices(current, lastAllowed) < 0) shouldReset = true;
+    if (exactMax && compareIndices(current, exactMax) > 0) shouldReset = true;
 
-    if (!shouldReset) return;
+    if (!shouldReset) {
+      ctx.state.lastAllowedStudentIndices = current;
+      return;
+    }
+
+    const target = (lastAllowed && lastAllowed.h === max.h)
+      ? lastAllowed
+      : (exactMax || max);
 
     ctx.state.applyingRemote = true;
     try {
-      ctx.deck.slide(max.h, max.v, max.f);
+      ctx.deck.slide(target.h, target.v, target.f);
     } finally {
       queueMicrotask(() => {
         ctx.state.applyingRemote = false;
@@ -562,6 +806,10 @@
               ctx.state.studentMaxIndices = titleSlideBoundary();
               ctx.state.hasExplicitBoundary = false;
               ctx.state.boundaryIsLocal = false;
+              ctx.state.exactStudentMaxIndices = null;
+              ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+              ctx.state.releaseStartH = null;
+              ctx.state.releaseEndH = null;
               // Prevent student from drawing on the chalkboard canvas.
               callChalkboard(ctx, 'configure', [{ readOnly: true }]);
             }
@@ -586,6 +834,7 @@
           setStudentBoundary(ctx, target, {
             syncToBoundary: !!payload.syncToBoundary,
             reason: 'allowStudentForwardTo',
+            releaseStartH: payload.releaseStartH,
           });
           break;
         }
@@ -594,6 +843,7 @@
           setStudentBoundary(ctx, target, {
             syncToBoundary: !!payload.syncToBoundary,
             reason: 'setStudentBoundary',
+            releaseStartH: payload.releaseStartH,
           });
           break;
         }
@@ -751,7 +1001,11 @@
         clearStudentBoundary(ctx, 'instructorCleared');
         return;
       }
-      setStudentBoundary(ctx, indices, { reason: 'instructorSet', localBoundary: true });
+      setStudentBoundary(ctx, indices, {
+        reason: 'instructorSet',
+        localBoundary: true,
+        releaseStartH: normalizeIndices(ctx.deck.getIndices()).h,
+      });
     };
     window.addEventListener('reveal-storyboard-boundary-moved', onBoundaryMoved);
 
@@ -786,10 +1040,15 @@
     document.addEventListener('broadcast', onChalkboardBroadcast);
 
     const pauseBlocker = createPauseInputBlocker(ctx);
+    const touchGestureBlocker = createTouchGestureBlocker(ctx);
     const blockedEvents = ['keydown', 'keyup', 'keypress', 'wheel', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
     blockedEvents.forEach((eventName) => {
       window.addEventListener(eventName, pauseBlocker, true);
     });
+    window.addEventListener('touchstart', touchGestureBlocker.onTouchStart, { capture: true, passive: true });
+    window.addEventListener('touchmove', touchGestureBlocker.onTouchMove, { capture: true, passive: false });
+    window.addEventListener('touchend', touchGestureBlocker.onTouchEnd, true);
+    window.addEventListener('touchcancel', touchGestureBlocker.onTouchEnd, true);
 
     ctx.cleanup.push(() => {
       deck.off('slidechanged', enforceStudentBounds);
@@ -810,6 +1069,10 @@
       blockedEvents.forEach((eventName) => {
         window.removeEventListener(eventName, pauseBlocker, true);
       });
+      window.removeEventListener('touchstart', touchGestureBlocker.onTouchStart, true);
+      window.removeEventListener('touchmove', touchGestureBlocker.onTouchMove, true);
+      window.removeEventListener('touchend', touchGestureBlocker.onTouchEnd, true);
+      window.removeEventListener('touchcancel', touchGestureBlocker.onTouchEnd, true);
     });
   }
 
@@ -855,6 +1118,11 @@
         studentMaxIndices: titleSlideBoundary(),  // default: title slide until instructor progresses
         hasExplicitBoundary: false,  // true once allowStudentForwardTo/setStudentBoundary received
         boundaryIsLocal: false,      // true when boundary was set by storyboard button (acting instructor)
+        exactStudentMaxIndices: null,
+        lastAllowedStudentIndices: titleSlideBoundary(),
+        touchGesture: null,
+        releaseStartH: null,
+        releaseEndH: null,
       },
     };
 
@@ -880,6 +1148,10 @@
             ctx.state.studentMaxIndices = titleSlideBoundary();
             ctx.state.hasExplicitBoundary = false;
             ctx.state.boundaryIsLocal = false;
+            ctx.state.exactStudentMaxIndices = null;
+            ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+            ctx.state.releaseStartH = null;
+            ctx.state.releaseEndH = null;
           }
           // Update navigation controls to reflect new role.
           updateNavigationControls(ctx);
