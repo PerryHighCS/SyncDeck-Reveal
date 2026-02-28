@@ -120,7 +120,7 @@ Allows a student to move forward up to the specified boundary, even if instructo
 {
   "name": "allowStudentForwardTo",
   "payload": {
-    "indices": { "h": 8, "v": 0, "f": 0 },
+    "indices": { "h": 8, "v": 0, "f": -1 },
     "syncToBoundary": false
   }
 }
@@ -142,7 +142,7 @@ Notes:
 {
   "name": "setStudentBoundary",
   "payload": {
-    "indices": { "h": 5, "v": 0, "f": 0 },
+    "indices": { "h": 5, "v": 0, "f": -1 },
     "syncToBoundary": true
   }
 }
@@ -289,12 +289,12 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
       "canNavigateBack": true,
       "canNavigateForward": false
     },
-    "studentBoundary": { "h": 2, "v": 0, "f": 0 },
+    "studentBoundary": { "h": 2, "v": 0, "f": -1 },
     "releasedRegion": { "startH": 0, "endH": 2 },
     "navigation": {
       "current": { "h": 2, "v": 0, "f": 0 },
       "minIndices": null,
-      "maxIndices": { "h": 2, "v": 0, "f": 0 },
+      "maxIndices": { "h": 2, "v": 0, "f": -1 },
       "canGoBack": true,
       "canGoForward": false,
       "canGoUp": false,
@@ -334,7 +334,7 @@ Sent by **any role** on: slide change, fragment shown/hidden, pause, resume, ove
       "canNavigateBack": true,
       "canNavigateForward": true
     },
-    "studentBoundary": { "h": 5, "v": 0, "f": 0 },
+    "studentBoundary": { "h": 5, "v": 0, "f": -1 },
     "releasedRegion": { "startH": 4, "endH": 5 },
     "navigation": {
       "current": { "h": 4, "v": 0, "f": 1 },
@@ -379,7 +379,7 @@ Emitted after `allowStudentForwardTo` / `setStudentBoundary` is applied, or when
   "action": "studentBoundaryChanged",
   "payload": {
     "reason": "allowStudentForwardTo",
-    "studentBoundary": { "h": 8, "v": 0, "f": 0 }
+    "studentBoundary": { "h": 8, "v": 0, "f": -1 }
   }
 }
 ```

@@ -102,7 +102,7 @@
     return {
       h: Number(indices?.h ?? 0),
       v: Number(indices?.v ?? 0),
-      f: Number(indices?.f ?? 0),
+      f: Number(indices?.f ?? -1),
     };
   }
 
