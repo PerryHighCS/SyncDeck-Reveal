@@ -16,7 +16,7 @@ test('loads the iframe sync and storyboard runtimes into a fixture deck', async 
   expect(status.role).toBe('standalone');
   expect(status.indices.h).toBe(0);
   expect(status.navigation.current.h).toBe(0);
-  expect(status.studentBoundary.h).toBe(0);
+  expect(status.studentBoundary).toBeNull();
 
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('reveal-storyboard-set', {
