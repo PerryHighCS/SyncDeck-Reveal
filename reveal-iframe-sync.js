@@ -74,7 +74,6 @@
       .reveal .controls .navigate-left[aria-disabled="true"],
       .reveal .controls .navigate-right[aria-disabled="true"] {
         animation: none !important;
-        transform: none !important;
       }
 
       .reveal .controls .navigate-left.disabled .controls-arrow,
@@ -82,7 +81,6 @@
       .reveal .controls .navigate-left[aria-disabled="true"] .controls-arrow,
       .reveal .controls .navigate-right[aria-disabled="true"] .controls-arrow {
         animation: none !important;
-        transform: none !important;
         transition: none !important;
       }
 
