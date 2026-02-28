@@ -244,7 +244,7 @@
         }
       }
 
-      if (inFollowInstructorMode && current.h >= boundaryH) {
+      if (inFollowInstructorMode && maxIndices && current.h >= boundaryH) {
         canGoForward = false;
         canGoDown = false;
       }

@@ -121,6 +121,7 @@ Allows a student to move forward up to the specified boundary, even if instructo
   "name": "allowStudentForwardTo",
   "payload": {
     "indices": { "h": 8, "v": 0, "f": -1 },
+    "releaseStartH": 3,
     "syncToBoundary": false
   }
 }
@@ -136,6 +137,7 @@ Notes:
 - When sent to an **instructor** iframe, the boundary is stored and shown as a visual marker in the storyboard strip together with the released-range highlight (display only — the instructor can still navigate freely). A `studentBoundaryChanged` message is still emitted with `role: "instructor"`.
 - With default plugin settings (`studentCanNavigateBack: true`, `studentCanNavigateForward: false`), student can move backward and forward only up to the granted boundary.
 - `syncToBoundary: true` also jumps the student immediately to that location (ignored for instructor role).
+- `releaseStartH` (optional number) lets the host explicitly declare the horizontal start of the released region used for emitted `releasedRegion` status. When omitted, the iframe falls back to its local current `h` when the boundary is applied.
 
 #### `setStudentBoundary` (explicit alias)
 
@@ -144,6 +146,7 @@ Notes:
   "name": "setStudentBoundary",
   "payload": {
     "indices": { "h": 5, "v": 0, "f": -1 },
+    "releaseStartH": 2,
     "syncToBoundary": true
   }
 }
