@@ -217,6 +217,9 @@
 
     let canGoBack = allowBackward && routes.hasPrev;
     let canGoForward = allowForward && routes.hasNext;
+    // Vertical stack navigation is intentionally treated as local movement
+    // within the current released horizontal slide. Back/forward capability
+    // flags gate horizontal progression, not up/down movement inside a stack.
     let canGoUp = routes.hasUp;
     let canGoDown = routes.hasDown;
 
