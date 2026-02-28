@@ -135,6 +135,7 @@
 
   function getStudentBoundary(ctx) {
     if (!ctx.state.studentMaxIndices) return null;
+    if (ctx.state.role !== 'student' && !ctx.state.hasExplicitBoundary) return null;
     return normalizeBoundaryIndices(ctx.state.studentMaxIndices);
   }
 
@@ -162,10 +163,10 @@
   }
 
   function buildReleasedRegion(ctx) {
-    // The title-slide defaults keep these fields numerically initialized even
-    // before any visible boundary/release exists for standalone or instructor
-    // roles. Only emit a released region when the iframe is actively tracking
-    // a student boundary (student follow mode or an explicit boundary).
+    // releaseStartH/releaseEndH stay null until a boundary is captured or
+    // explicitly applied. Only emit a released region when the iframe is
+    // actively tracking a student boundary (student follow mode or an explicit
+    // boundary).
     const hasActiveReleasedRegion = ctx.state.role === 'student' || ctx.state.hasExplicitBoundary;
     if (!hasActiveReleasedRegion) {
       return null;
@@ -657,6 +658,9 @@
 
     const current = normalizeIndices(ctx.deck.getIndices());
     const max = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
+    const lastAllowed = ctx.state.lastAllowedStudentIndices
+      ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
+      : null;
     const exactMax = ctx.state.exactStudentMaxIndices
       ? normalizeIndices(ctx.state.exactStudentMaxIndices)
       : null;
@@ -672,6 +676,7 @@
     let shouldReset = false;
     if (!canGoForward && current.h > max.h) shouldReset = true;
     if (!canGoBack && current.h < max.h) shouldReset = true;
+    if (!canGoBack && lastAllowed && compareIndices(current, lastAllowed) < 0) shouldReset = true;
     if (exactMax && compareIndices(current, exactMax) > 0) shouldReset = true;
 
     if (!shouldReset) {
@@ -679,9 +684,6 @@
       return;
     }
 
-    const lastAllowed = ctx.state.lastAllowedStudentIndices
-      ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
-      : null;
     const target = (lastAllowed && lastAllowed.h === max.h)
       ? lastAllowed
       : (exactMax || max);
