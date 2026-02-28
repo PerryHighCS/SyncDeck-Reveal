@@ -46,7 +46,10 @@
   <script src="../../reveal-iframe-sync.js"></script>
   <script src="../../reveal-storyboard.js"></script>
   <script>
-    window.Reveal = window.createRevealStub();
+    const harnessConfig = window.__syncHarnessConfig || {};
+    const revealOptions = harnessConfig.revealOptions || {};
+
+    window.Reveal = window.createRevealStub(revealOptions);
     window.__syncHarness = {
       reveal: window.Reveal,
       syncApi: window.RevealIframeSync.init(window.Reveal),
@@ -57,7 +60,7 @@
         reveal: window.Reveal,
         storyboardId: 'storyboard',
         trackId: 'storyboard-track',
-        toggleKey: 'm',
+        toggleKey: harnessConfig.toggleKey || 'm',
       });
     }
   </script>
