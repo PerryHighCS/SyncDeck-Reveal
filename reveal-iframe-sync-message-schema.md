@@ -131,6 +131,7 @@ Notes:
 - If the student is already **past** the new boundary when it is received, they are immediately rubber-banded back to it.
 - Boundary enforcement is horizontal-only. `v` / `f` may still be present in payloads for compatibility, but the runtime canonicalizes stored boundaries to `{ h, v: 0, f: -1 }`.
 - Because boundary enforcement is horizontal-only, students may continue moving within vertical child slides and fragments at the boundary `h` position.
+- Exception: when the boundary is pulled back behind a student and the host is intentionally snapping that student back to the instructor's exact current position, the runtime may temporarily retain the requested `v` / `f` as an exact lock target so the student cannot continue fragments independently after the pullback. This exact lock applies only to that snap-back case; normal released-region enforcement remains horizontal-only.
 - Navigation enforcement (preventing forward travel) applies only when role is `student`.
 - When sent to an **instructor** iframe, the boundary is stored and shown as a visual marker in the storyboard strip together with the released-range highlight (display only — the instructor can still navigate freely). A `studentBoundaryChanged` message is still emitted with `role: "instructor"`.
 - With default plugin settings (`studentCanNavigateBack: true`, `studentCanNavigateForward: false`), student can move backward and forward only up to the granted boundary.
@@ -355,7 +356,7 @@ Sent by **any role** on: slide change, fragment shown/hidden, pause, resume, ove
 
 `overview` reflects whether the **custom storyboard strip** is currently open (`true` = strip is visible).
 
-`studentBoundary` — `null` until a boundary has been established; `{ h, v, f }` once set. Non-null for **both student and instructor** roles once a boundary is in effect. For instructors this reflects the boundary currently displayed in the storyboard strip. Cleared to `null` when `clearBoundary` command is received. The runtime currently treats this boundary as horizontal-only and canonicalizes it to `{ h, v: 0, f: -1 }`.
+`studentBoundary` — `null` until a boundary has been established; `{ h, v, f }` once set. Non-null for **both student and instructor** roles once a boundary is in effect. For instructors this reflects the boundary currently displayed in the storyboard strip. Cleared to `null` when `clearBoundary` command is received. The runtime normally treats this boundary as horizontal-only and canonicalizes it to `{ h, v: 0, f: -1 }`. The only exception is the exact snap-back lock used when a student is pulled back behind the boundary to the instructor's precise current slide/fragment.
 
 `boundaryIsLocal` — `true` when this iframe set the boundary itself (via the storyboard ⚑ button) rather than receiving it from the host. The storyboard uses this to skip forward-navigation restrictions for the acting instructor even if their role hasn't been upgraded to `"instructor"` yet.
 
