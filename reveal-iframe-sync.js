@@ -158,19 +158,13 @@
     };
   }
 
-  function hasForwardStepWithinCurrentHorizontal(deck) {
-    const routes = getDirectionalRoutes(deck);
-    if (routes.hasDown) return true;
-
+  function hasForwardFragmentStep(deck) {
     const currentSlide = deck.getCurrentSlide?.();
     if (!currentSlide) return false;
     return !!currentSlide.querySelector('.fragment:not(.visible)');
   }
 
-  function hasBackwardStepWithinCurrentHorizontal(deck) {
-    const routes = getDirectionalRoutes(deck);
-    if (routes.hasUp) return true;
-
+  function hasBackwardFragmentStep(deck) {
     const current = normalizeIndices(deck.getIndices());
     return current.f > -1;
   }
@@ -214,12 +208,15 @@
     const allowForward = ctx.state.role === 'student'
       ? (ctx.state.hasExplicitBoundary || roleCaps.canNavigateForward)
       : roleCaps.canNavigateForward;
+    const hasBackwardFragment = hasBackwardFragmentStep(ctx.deck);
+    const hasForwardFragment = hasForwardFragmentStep(ctx.deck);
 
-    let canGoBack = allowBackward && routes.hasPrev;
-    let canGoForward = allowForward && routes.hasNext;
-    // Vertical stack navigation is intentionally treated as local movement
-    // within the current released horizontal slide. Back/forward capability
-    // flags gate horizontal progression, not up/down movement inside a stack.
+    // Treat fragments as part of linear prev/next progression, but keep
+    // horizontal left/right routes separate from vertical stack movement.
+    let canGoBack = allowBackward && (routes.hasLeft || hasBackwardFragment);
+    let canGoForward = allowForward && (routes.hasRight || hasForwardFragment);
+    let canGoLeft = allowBackward && routes.hasLeft;
+    let canGoRight = allowForward && routes.hasRight;
     let canGoUp = routes.hasUp;
     let canGoDown = routes.hasDown;
 
@@ -229,26 +226,30 @@
       if (minIndices) {
         if (current.h < boundaryH) {
           canGoBack = false;
+          canGoLeft = false;
           canGoUp = false;
         } else if (current.h === boundaryH) {
-          canGoBack = canGoBack && hasBackwardStepWithinCurrentHorizontal(ctx.deck);
-          canGoUp = canGoUp && hasBackwardStepWithinCurrentHorizontal(ctx.deck);
+          canGoBack = canGoBack && hasBackwardFragment;
+          canGoLeft = false;
+          canGoUp = canGoUp && routes.hasUp;
         }
       }
 
       if (maxIndices) {
         if (current.h > boundaryH) {
           canGoForward = false;
+          canGoRight = false;
           canGoDown = false;
         } else if (current.h === boundaryH) {
-          const canAdvanceWithinCurrentHorizontal = hasForwardStepWithinCurrentHorizontal(ctx.deck);
-          canGoForward = canGoForward && canAdvanceWithinCurrentHorizontal;
-          canGoDown = canGoDown && canAdvanceWithinCurrentHorizontal;
+          canGoForward = canGoForward && hasForwardFragment;
+          canGoRight = false;
+          canGoDown = canGoDown && routes.hasDown;
         }
       }
 
       if (inFollowInstructorMode && maxIndices && current.h >= boundaryH) {
         canGoForward = false;
+        canGoRight = false;
         canGoDown = false;
       }
 
@@ -266,6 +267,8 @@
       maxIndices,
       canGoBack,
       canGoForward,
+      canGoLeft,
+      canGoRight,
       canGoUp,
       canGoDown,
     };
@@ -282,8 +285,8 @@
       if (!controls) return;
 
       const isStudent = ctx.state.role === 'student';
-      const blockForward = isStudent && !nav.canGoForward;
-      const blockBack = isStudent && !nav.canGoBack;
+      const blockForward = isStudent && !nav.canGoRight;
+      const blockBack = isStudent && !nav.canGoLeft;
 
       // Only lock left/right (horizontal navigation tied to boundaries).
       // Up/down (vertical nested slides) are independent and RevealJS handles visibility.
@@ -324,15 +327,21 @@
     // Use a keyboard map to selectively enable only permitted navigation keys.
     const keyboardMap = {};
 
-    if (nav.canGoBack) {
+    if (nav.canGoLeft) {
       keyboardMap[37] = 'left';   // left arrow
       keyboardMap[72] = 'left';   // h
+    }
+
+    if (nav.canGoBack) {
       keyboardMap[33] = 'prev';   // page up
     }
 
-    if (nav.canGoForward) {
+    if (nav.canGoRight) {
       keyboardMap[39] = 'right';  // right arrow
       keyboardMap[76] = 'right';  // l
+    }
+
+    if (nav.canGoForward) {
       keyboardMap[34] = 'next';   // page down
       keyboardMap[32] = 'next';   // space
     }
@@ -433,6 +442,77 @@
       if (typeof event.stopImmediatePropagation === 'function') {
         event.stopImmediatePropagation();
       }
+    };
+  }
+
+  function stopGestureEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  function createTouchGestureBlocker(ctx) {
+    const SWIPE_THRESHOLD_PX = 12;
+
+    return {
+      onTouchStart(event) {
+        if (ctx.state.role !== 'student') return;
+        if (ctx.state.pauseLockedByHost) return;
+        if (event.touches.length !== 1) {
+          ctx.state.touchGesture = null;
+          return;
+        }
+        const touch = event.touches[0];
+        ctx.state.touchGesture = {
+          id: touch.identifier,
+          startX: touch.clientX,
+          startY: touch.clientY,
+          handled: false,
+        };
+      },
+
+      onTouchMove(event) {
+        const gesture = ctx.state.touchGesture;
+        if (!gesture || gesture.handled) return;
+        if (ctx.state.role !== 'student' || ctx.state.pauseLockedByHost) return;
+
+        const touch = Array.from(event.touches).find((entry) => entry.identifier === gesture.id);
+        if (!touch) return;
+
+        const deltaX = touch.clientX - gesture.startX;
+        const deltaY = touch.clientY - gesture.startY;
+        if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX || Math.abs(deltaX) <= Math.abs(deltaY)) {
+          return;
+        }
+
+        const nav = buildNavigationStatus(ctx);
+        const isForwardSwipe = deltaX < 0;
+        const canUseHorizontalRoute = isForwardSwipe ? nav.canGoRight : nav.canGoLeft;
+        const canUseLinearStep = isForwardSwipe ? nav.canGoForward : nav.canGoBack;
+
+        if (canUseHorizontalRoute) {
+          return;
+        }
+
+        stopGestureEvent(event);
+        gesture.handled = true;
+
+        if (!canUseLinearStep) {
+          return;
+        }
+
+        if (isForwardSwipe) {
+          ctx.deck.next?.();
+        } else {
+          ctx.deck.prev?.();
+        }
+      },
+
+      onTouchEnd() {
+        ctx.state.touchGesture = null;
+      },
     };
   }
 
@@ -954,10 +1034,15 @@
     document.addEventListener('broadcast', onChalkboardBroadcast);
 
     const pauseBlocker = createPauseInputBlocker(ctx);
+    const touchGestureBlocker = createTouchGestureBlocker(ctx);
     const blockedEvents = ['keydown', 'keyup', 'keypress', 'wheel', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'pointerdown', 'pointerup'];
     blockedEvents.forEach((eventName) => {
       window.addEventListener(eventName, pauseBlocker, true);
     });
+    window.addEventListener('touchstart', touchGestureBlocker.onTouchStart, { capture: true, passive: true });
+    window.addEventListener('touchmove', touchGestureBlocker.onTouchMove, { capture: true, passive: false });
+    window.addEventListener('touchend', touchGestureBlocker.onTouchEnd, true);
+    window.addEventListener('touchcancel', touchGestureBlocker.onTouchEnd, true);
 
     ctx.cleanup.push(() => {
       deck.off('slidechanged', enforceStudentBounds);
@@ -978,6 +1063,10 @@
       blockedEvents.forEach((eventName) => {
         window.removeEventListener(eventName, pauseBlocker, true);
       });
+      window.removeEventListener('touchstart', touchGestureBlocker.onTouchStart, true);
+      window.removeEventListener('touchmove', touchGestureBlocker.onTouchMove, true);
+      window.removeEventListener('touchend', touchGestureBlocker.onTouchEnd, true);
+      window.removeEventListener('touchcancel', touchGestureBlocker.onTouchEnd, true);
     });
   }
 
@@ -1025,6 +1114,7 @@
         boundaryIsLocal: false,      // true when boundary was set by storyboard button (acting instructor)
         exactStudentMaxIndices: null,
         lastAllowedStudentIndices: titleSlideBoundary(),
+        touchGesture: null,
         releaseStartH: 0,
         releaseEndH: 0,
       },
