@@ -369,7 +369,9 @@
         }
         button.addEventListener('click', () => {
           const currentIndices = normalizeIndices(reveal.getIndices());
-          const targetV = currentIndices.h === entry.h ? currentIndices.v : 0;
+          const targetV = currentIndices.h === entry.h
+            ? Math.max(0, Math.min(entry.childSections.length - 1, currentIndices.v))
+            : 0;
           reveal.slide(entry.h, entry.isStack ? targetV : 0);
         });
         wrap.appendChild(button);
@@ -514,8 +516,14 @@
     // Scoped to storyboardTrack so arrow keys only fire when inside the strip.
     storyboardTrack.addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      const navBtns = Array.from(storyboardTrack.querySelectorAll('button.story-thumb'));
-      const cur = navBtns.indexOf(document.activeElement);
+      const activeEl = document.activeElement;
+      const focusWithinStoryboard = activeEl && storyboardTrack.contains(activeEl);
+      if (!focusWithinStoryboard) return;
+
+      const navBtns = Array.from(
+        storyboardTrack.querySelectorAll('button.story-thumb, button.story-stack-child'),
+      );
+      const cur = navBtns.indexOf(activeEl);
       if (cur === -1) return;
       e.preventDefault(); // prevent Reveal from consuming arrow keys
       const next = e.key === 'ArrowRight'
