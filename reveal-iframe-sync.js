@@ -176,13 +176,13 @@
   }
 
   function buildReleasedRegion(ctx) {
-    const boundary = getStudentBoundary(ctx);
-    if (!boundary) return null;
+    if (!Number.isFinite(ctx.state.releaseStartH) || !Number.isFinite(ctx.state.releaseEndH)) {
+      return null;
+    }
 
-    const current = normalizeIndices(ctx.deck.getIndices());
     return {
-      startH: Math.min(current.h, boundary.h),
-      endH: Math.max(current.h, boundary.h),
+      startH: ctx.state.releaseStartH,
+      endH: ctx.state.releaseEndH,
     };
   }
 
@@ -190,6 +190,9 @@
     const current = normalizeIndices(ctx.deck.getIndices());
     const roleCaps = getRoleCapabilities(ctx);
     const studentBoundary = getStudentBoundary(ctx);
+    const exactStudentBoundary = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
     const routes = getDirectionalRoutes(ctx.deck);
 
     let minIndices = null;
@@ -244,6 +247,13 @@
       if (inFollowInstructorMode && current.h >= boundaryH) {
         canGoForward = false;
         canGoDown = false;
+      }
+
+      if (exactStudentBoundary && current.h === exactStudentBoundary.h) {
+        if (compareIndices(current, exactStudentBoundary) >= 0) {
+          canGoForward = false;
+          canGoDown = false;
+        }
       }
     }
 
@@ -440,7 +450,10 @@
   }
 
   function captureStudentBoundary(ctx) {
-    ctx.state.studentMaxIndices = normalizeBoundaryIndices(ctx.deck.getIndices());
+    const current = normalizeBoundaryIndices(ctx.deck.getIndices());
+    ctx.state.studentMaxIndices = current;
+    ctx.state.releaseStartH = current.h;
+    ctx.state.releaseEndH = current.h;
   }
 
   /** Default boundary for a student before the instructor has progressed. */
@@ -451,13 +464,25 @@
   function setStudentBoundary(ctx, indices, options = {}) {
     if (!indices) return false;
 
-    const nextBoundary = normalizeBoundaryIndices(indices);
+    const requestedBoundary = normalizeIndices(indices);
+    const nextBoundary = normalizeBoundaryIndices(requestedBoundary);
+    const current = normalizeIndices(ctx.deck.getIndices());
     ctx.state.studentMaxIndices = nextBoundary;
     ctx.state.hasExplicitBoundary = true;
+    const releaseStartH = Number.isFinite(Number(options.releaseStartH))
+      ? Number(options.releaseStartH)
+      : normalizeIndices(ctx.deck.getIndices()).h;
+    ctx.state.releaseStartH = Math.min(releaseStartH, nextBoundary.h);
+    ctx.state.releaseEndH = Math.max(releaseStartH, nextBoundary.h);
 
     // Track whether this boundary originated locally (storyboard button) so the
     // storyboard can skip forward-restriction for the acting instructor.
     ctx.state.boundaryIsLocal = !!options.localBoundary;
+
+    const shouldExactLock = !options.localBoundary
+      && ctx.state.role === 'student'
+      && compareIndices(current, requestedBoundary) > 0;
+    ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
 
     // Notify the storyboard so it can display the boundary marker for all roles.
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
@@ -467,12 +492,11 @@
     if (ctx.state.role === 'student') {
       if (options.syncToBoundary) {
         // Jump student to the boundary slide.
-        ctx.deck.slide(nextBoundary.h, nextBoundary.v, nextBoundary.f);
+        ctx.deck.slide(requestedBoundary.h, requestedBoundary.v, requestedBoundary.f);
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
-        const current = normalizeIndices(ctx.deck.getIndices());
-        if (current.h > nextBoundary.h) {
-          ctx.deck.slide(nextBoundary.h, nextBoundary.v, nextBoundary.f);
+        if (compareIndices(current, requestedBoundary) > 0) {
+          ctx.deck.slide(requestedBoundary.h, requestedBoundary.v, requestedBoundary.f);
         }
       }
     }
@@ -493,6 +517,9 @@
     ctx.state.studentMaxIndices = null;
     ctx.state.hasExplicitBoundary = false;
     ctx.state.boundaryIsLocal = false;
+    ctx.state.exactStudentMaxIndices = null;
+    ctx.state.releaseStartH = null;
+    ctx.state.releaseEndH = null;
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
       detail: { indices: null },
     }));
@@ -517,6 +544,9 @@
 
     const current = normalizeIndices(ctx.deck.getIndices());
     const max = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
+    const exactMax = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
 
     const canGoBack = !!ctx.config.studentCanNavigateBack;
     // An explicit boundary (allowStudentForwardTo / setStudentBoundary) always
@@ -529,12 +559,23 @@
     let shouldReset = false;
     if (!canGoForward && current.h > max.h) shouldReset = true;
     if (!canGoBack && current.h < max.h) shouldReset = true;
+    if (exactMax && compareIndices(current, exactMax) > 0) shouldReset = true;
 
-    if (!shouldReset) return;
+    if (!shouldReset) {
+      ctx.state.lastAllowedStudentIndices = current;
+      return;
+    }
+
+    const lastAllowed = ctx.state.lastAllowedStudentIndices
+      ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
+      : null;
+    const target = (lastAllowed && lastAllowed.h === max.h)
+      ? lastAllowed
+      : (exactMax || max);
 
     ctx.state.applyingRemote = true;
     try {
-      ctx.deck.slide(max.h, max.v, max.f);
+      ctx.deck.slide(target.h, target.v, target.f);
     } finally {
       queueMicrotask(() => {
         ctx.state.applyingRemote = false;
@@ -648,6 +689,10 @@
               ctx.state.studentMaxIndices = titleSlideBoundary();
               ctx.state.hasExplicitBoundary = false;
               ctx.state.boundaryIsLocal = false;
+              ctx.state.exactStudentMaxIndices = null;
+              ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+              ctx.state.releaseStartH = 0;
+              ctx.state.releaseEndH = 0;
               // Prevent student from drawing on the chalkboard canvas.
               callChalkboard(ctx, 'configure', [{ readOnly: true }]);
             }
@@ -672,6 +717,7 @@
           setStudentBoundary(ctx, target, {
             syncToBoundary: !!payload.syncToBoundary,
             reason: 'allowStudentForwardTo',
+            releaseStartH: payload.releaseStartH,
           });
           break;
         }
@@ -680,6 +726,7 @@
           setStudentBoundary(ctx, target, {
             syncToBoundary: !!payload.syncToBoundary,
             reason: 'setStudentBoundary',
+            releaseStartH: payload.releaseStartH,
           });
           break;
         }
@@ -837,7 +884,11 @@
         clearStudentBoundary(ctx, 'instructorCleared');
         return;
       }
-      setStudentBoundary(ctx, indices, { reason: 'instructorSet', localBoundary: true });
+      setStudentBoundary(ctx, indices, {
+        reason: 'instructorSet',
+        localBoundary: true,
+        releaseStartH: normalizeIndices(ctx.deck.getIndices()).h,
+      });
     };
     window.addEventListener('reveal-storyboard-boundary-moved', onBoundaryMoved);
 
@@ -941,6 +992,10 @@
         studentMaxIndices: titleSlideBoundary(),  // default: title slide until instructor progresses
         hasExplicitBoundary: false,  // true once allowStudentForwardTo/setStudentBoundary received
         boundaryIsLocal: false,      // true when boundary was set by storyboard button (acting instructor)
+        exactStudentMaxIndices: null,
+        lastAllowedStudentIndices: titleSlideBoundary(),
+        releaseStartH: 0,
+        releaseEndH: 0,
       },
     };
 
@@ -966,6 +1021,10 @@
             ctx.state.studentMaxIndices = titleSlideBoundary();
             ctx.state.hasExplicitBoundary = false;
             ctx.state.boundaryIsLocal = false;
+            ctx.state.exactStudentMaxIndices = null;
+            ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+            ctx.state.releaseStartH = 0;
+            ctx.state.releaseEndH = 0;
           }
           // Update navigation controls to reflect new role.
           updateNavigationControls(ctx);
