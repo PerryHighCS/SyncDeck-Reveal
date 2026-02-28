@@ -19,7 +19,7 @@ This file applies to the `vendor/SyncDeck-Reveal/js/` submodule.
   storyboard rendering, keyboard mapping, touch/swipe behavior, or chalkboard
   sync must include automated test coverage in the same change.
 - Do not merge or commit behavior changes here with "tests later" as the plan.
-- If a bug fix reproduces a regression, add a test that fails before the fix and
+- If a change fixes a regression, add a test that fails before the fix and
   passes after it.
 - If code is refactored without intended behavior change, run the relevant test
   coverage anyway and expand tests if the refactor changes control flow in a way
