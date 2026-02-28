@@ -493,7 +493,9 @@
         const nav = buildNavigationStatus(ctx);
         const isForwardSwipe = deltaX < 0;
         const canUseHorizontalRoute = isForwardSwipe ? nav.canGoRight : nav.canGoLeft;
-        const canUseLinearStep = isForwardSwipe ? nav.canGoForward : nav.canGoBack;
+        const canUseFragmentStep = isForwardSwipe
+          ? (nav.canGoForward && hasForwardFragmentStep(ctx.deck))
+          : (nav.canGoBack && hasBackwardFragmentStep(ctx.deck));
 
         if (canUseHorizontalRoute) {
           return;
@@ -502,7 +504,7 @@
         stopGestureEvent(event);
         gesture.handled = true;
 
-        if (!canUseLinearStep) {
+        if (!canUseFragmentStep) {
           return;
         }
 
