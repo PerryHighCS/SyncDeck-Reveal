@@ -481,8 +481,9 @@
 
     const shouldExactLock = !options.localBoundary
       && ctx.state.role === 'student'
-      && compareIndices(current, requestedBoundary) > 0;
+      && current.h > nextBoundary.h;
     ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
+    const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
 
     // Notify the storyboard so it can display the boundary marker for all roles.
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
@@ -492,11 +493,11 @@
     if (ctx.state.role === 'student') {
       if (options.syncToBoundary) {
         // Jump student to the boundary slide.
-        ctx.deck.slide(requestedBoundary.h, requestedBoundary.v, requestedBoundary.f);
+        ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
-        if (compareIndices(current, requestedBoundary) > 0) {
-          ctx.deck.slide(requestedBoundary.h, requestedBoundary.v, requestedBoundary.f);
+        if (current.h > nextBoundary.h) {
+          ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
         }
       }
     }

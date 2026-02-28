@@ -318,7 +318,7 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
 - `canGoForward`: final boolean for enabling/disabling a host "next" arrow.
 - `canGoUp` / `canGoDown`: vertical movement availability inside the current horizontal position. These remain independently useful when the student is at the boundary `h` and still allowed to browse a vertical stack or remaining fragments.
 
-`releasedRegion` is the instructor/storyboard-facing horizontal min/max range between the current slide `h` and the current boundary `h`. It is primarily used to highlight the active released range in the storyboard.
+`releasedRegion` is the stored instructor/storyboard-facing horizontal min/max range between the release start `h` captured when the boundary was granted/applied and the current boundary `h`. It does not automatically recompute from the viewer's current slide position on every status emission. It is primarily used to highlight the active released range in the storyboard.
 
 ### `state`
 
