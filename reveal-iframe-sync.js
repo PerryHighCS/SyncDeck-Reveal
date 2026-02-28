@@ -484,6 +484,13 @@
     // storyboard can skip forward-restriction for the acting instructor.
     ctx.state.boundaryIsLocal = !!options.localBoundary;
 
+    // Compare against the full requested position here rather than the
+    // canonicalized horizontal boundary. This is the one place where a
+    // same-h pullback should count as "past" so the student can be snapped
+    // back to the instructor's exact current location (including the canonical
+    // root position { h, v: 0, f: -1 } when the instructor is at the top of a
+    // stack / fragment sequence). Normal boundary storage and steady-state
+    // navigation enforcement remain horizontal-only via nextBoundary.
     const isPastRequestedBoundary = compareIndices(current, requestedBoundary) > 0;
     const shouldExactLock = !options.localBoundary
       && ctx.state.role === 'student'
