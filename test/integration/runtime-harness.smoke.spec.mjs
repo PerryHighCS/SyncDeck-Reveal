@@ -14,7 +14,8 @@ test('loads the iframe sync and storyboard runtimes into a fixture deck', async 
 
   const status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.role).toBe('standalone');
-  expect(status.current.h).toBe(0);
+  expect(status.indices.h).toBe(0);
+  expect(status.navigation.current.h).toBe(0);
   expect(status.studentBoundary.h).toBe(0);
 
   await page.evaluate(() => {
