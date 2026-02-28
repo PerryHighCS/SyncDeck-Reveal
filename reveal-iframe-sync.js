@@ -162,6 +162,15 @@
   }
 
   function buildReleasedRegion(ctx) {
+    // The title-slide defaults keep these fields numerically initialized even
+    // before any visible boundary/release exists for standalone or instructor
+    // roles. Only emit a released region when the iframe is actively tracking
+    // a student boundary (student follow mode or an explicit boundary).
+    const hasActiveReleasedRegion = ctx.state.role === 'student' || ctx.state.hasExplicitBoundary;
+    if (!hasActiveReleasedRegion) {
+      return null;
+    }
+
     if (!Number.isFinite(ctx.state.releaseStartH) || !Number.isFinite(ctx.state.releaseEndH)) {
       return null;
     }
@@ -210,8 +219,8 @@
     let canGoForward = allowForward && (routes.hasRight || routes.hasDown || hasForwardFragment);
     let canGoLeft = allowBackward && routes.hasLeft;
     let canGoRight = allowForward && routes.hasRight;
-    let canGoUp = routes.hasUp;
-    let canGoDown = routes.hasDown;
+    let canGoUp = allowBackward && routes.hasUp;
+    let canGoDown = allowForward && routes.hasDown;
 
     if (ctx.state.role === 'student' && studentBoundary) {
       const boundaryH = studentBoundary.h;
@@ -795,8 +804,8 @@
               ctx.state.boundaryIsLocal = false;
               ctx.state.exactStudentMaxIndices = null;
               ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
-              ctx.state.releaseStartH = 0;
-              ctx.state.releaseEndH = 0;
+              ctx.state.releaseStartH = null;
+              ctx.state.releaseEndH = null;
               // Prevent student from drawing on the chalkboard canvas.
               callChalkboard(ctx, 'configure', [{ readOnly: true }]);
             }
@@ -1108,8 +1117,8 @@
         exactStudentMaxIndices: null,
         lastAllowedStudentIndices: titleSlideBoundary(),
         touchGesture: null,
-        releaseStartH: 0,
-        releaseEndH: 0,
+        releaseStartH: null,
+        releaseEndH: null,
       },
     };
 
@@ -1137,8 +1146,8 @@
             ctx.state.boundaryIsLocal = false;
             ctx.state.exactStudentMaxIndices = null;
             ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
-            ctx.state.releaseStartH = 0;
-            ctx.state.releaseEndH = 0;
+            ctx.state.releaseStartH = null;
+            ctx.state.releaseEndH = null;
           }
           // Update navigation controls to reflect new role.
           updateNavigationControls(ctx);

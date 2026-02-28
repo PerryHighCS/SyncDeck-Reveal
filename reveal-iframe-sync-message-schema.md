@@ -296,7 +296,7 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
     "studentBoundary": { "h": 2, "v": 0, "f": -1 },
     "releasedRegion": { "startH": 0, "endH": 2 },
     "navigation": {
-      "current": { "h": 2, "v": 0, "f": 0 },
+      "current": { "h": 2, "v": 0, "f": -1 },
       "minIndices": null,
       "maxIndices": { "h": 2, "v": 0, "f": -1 },
       "canGoBack": true,
@@ -307,7 +307,7 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
       "canGoDown": true
     },
     "revealState": {},
-    "indices": { "h": 2, "v": 0, "f": 0 },
+    "indices": { "h": 2, "v": 0, "f": -1 },
     "paused": false,
     "overview": false
   }
@@ -323,7 +323,7 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
 - `canGoBack`: final boolean for generic "previous" progression. Includes fragment rewind and vertical stack movement when Reveal `prev()` would use them.
 - `canGoForward`: final boolean for generic "next" progression. Includes fragment advance and vertical stack movement when Reveal `next()` would use them.
 - `canGoLeft` / `canGoRight`: strictly horizontal movement availability for left/right arrows, host controls, and horizontal swipe gestures. These exclude fragment progression and vertical stack movement.
-- `canGoUp` / `canGoDown`: vertical stack movement availability inside the current horizontal position. These remain independently useful when the student is at the boundary `h` and still allowed to browse a vertical stack.
+- `canGoUp` / `canGoDown`: vertical stack movement availability inside the current horizontal position after SyncDeck back/forward policy is applied. These remain independently useful when the student is at the boundary `h` and still allowed to browse a vertical stack.
 
 `releasedRegion` is the stored instructor/storyboard-facing horizontal min/max range between the release start `h` captured when the boundary was granted/applied and the current boundary `h`. It does not automatically recompute from the viewer's current slide position on every status emission. It is primarily used to highlight the active released range in the storyboard.
 
