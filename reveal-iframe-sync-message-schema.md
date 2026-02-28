@@ -301,6 +301,8 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
       "maxIndices": { "h": 2, "v": 0, "f": -1 },
       "canGoBack": true,
       "canGoForward": false,
+      "canGoLeft": true,
+      "canGoRight": false,
       "canGoUp": false,
       "canGoDown": true
     },
@@ -347,6 +349,8 @@ Sent by **any role** on: slide change, fragment shown/hidden, pause, resume, ove
       "maxIndices": null,
       "canGoBack": true,
       "canGoForward": true,
+      "canGoLeft": true,
+      "canGoRight": true,
       "canGoUp": false,
       "canGoDown": false
     },

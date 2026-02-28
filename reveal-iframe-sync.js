@@ -142,15 +142,7 @@
     const routes = (typeof deck.availableRoutes === 'function')
       ? (deck.availableRoutes() || {})
       : {};
-    const hasPrev = (typeof deck.hasPrevious === 'function')
-      ? !!deck.hasPrevious()
-      : !!(routes.left || routes.up);
-    const hasNext = (typeof deck.hasNext === 'function')
-      ? !!deck.hasNext()
-      : !!(routes.right || routes.down);
     return {
-      hasPrev,
-      hasNext,
       hasLeft: !!routes.left,
       hasRight: !!routes.right,
       hasUp: !!routes.up,
