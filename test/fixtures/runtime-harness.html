@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncDeck Runtime Harness</title>
+</head>
+<body>
+  <div class="reveal">
+    <aside class="controls">
+      <button class="navigate-left" type="button" aria-label="Previous slide"></button>
+      <button class="navigate-right" type="button" aria-label="Next slide"></button>
+    </aside>
+    <div class="slides">
+      <section>
+        <h2>Intro</h2>
+        <p>Fixture slide one.</p>
+      </section>
+      <section>
+        <h2>Second</h2>
+        <p>Fixture slide two.</p>
+      </section>
+      <section>
+        <h2>Third</h2>
+        <p>Fixture slide three.</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="storyboard" class="storyboard" aria-hidden="true">
+    <div id="storyboard-track" class="storyboard-track"></div>
+  </div>
+
+  <script src="./helpers/reveal-stub.js"></script>
+  <script src="../../reveal-iframe-sync.js"></script>
+  <script src="../../reveal-storyboard.js"></script>
+  <script>
+    window.Reveal = window.createRevealStub();
+    window.__syncHarness = {
+      reveal: window.Reveal,
+      syncApi: window.RevealIframeSync.init(window.Reveal),
+    };
+
+    if (window.initRevealStoryboard) {
+      window.initRevealStoryboard({
+        reveal: window.Reveal,
+        storyboardId: 'storyboard',
+        trackId: 'storyboard-track',
+        toggleKey: 'm',
+      });
+    }
+  </script>
+</body>
+</html>

@@ -12,7 +12,8 @@ the runtime scripts themselves.
 ## Constraints
 
 - The runtime scripts are plain IIFE files.
-- The submodule currently has no test harness, package manifest, or test files.
+- The test harness should remain lightweight and must not introduce a
+  production build step for the runtime scripts.
 - Navigation behavior depends on Reveal route semantics, DOM state, keyboard
   mapping, and touch/swipe handling.
 

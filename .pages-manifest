@@ -3,12 +3,14 @@
 exclude test/
 exclude coverage/
 exclude node_modules/
+exclude playwright-report/
 exclude package.json
 exclude package-lock.json
 exclude vitest.config.js
 exclude vitest.config.mjs
 exclude playwright.config.js
 exclude playwright.config.mjs
+exclude test-results/
 exclude AGENTS.md
 exclude TESTING_PLAN.md
 exclude .pages-manifest
