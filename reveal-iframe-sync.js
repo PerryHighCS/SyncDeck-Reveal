@@ -456,6 +456,14 @@
     const current = normalizeIndices(ctx.deck.getIndices());
     const boundary = normalizeBoundaryIndices(current);
     ctx.state.studentMaxIndices = boundary;
+    // In follow-instructor mode with forward navigation disabled, the captured
+    // instructor position acts as an exact safety-net max. UI controls already
+    // suppress same-h down/fragment advance, but keeping the precise synced
+    // indices here lets enforceStudentNavigationBoundary snap back if touch or
+    // direct API calls move the student deeper within the current stack.
+    ctx.state.exactStudentMaxIndices = ctx.config.studentCanNavigateForward
+      ? null
+      : current;
     ctx.state.lastAllowedStudentIndices = current;
     ctx.state.releaseStartH = boundary.h;
     ctx.state.releaseEndH = boundary.h;
