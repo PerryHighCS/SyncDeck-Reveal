@@ -325,6 +325,11 @@
       storyboardTrack.setAttribute('aria-label', 'Slide storyboard');
 
       const status = getSyncStatus();
+      const statusBoundaryH = status?.studentBoundary?.h;
+      updateBoundaryMarker(
+        statusBoundaryH != null ? Number(statusBoundaryH) : null,
+        { announce: false },
+      );
       const activeIndices = normalizeIndices(reveal.getIndices());
       const entries = getStoryboardEntries();
       const allowedMaxIndex = getAllowedMaxSlideIndex();
