@@ -366,6 +366,82 @@ test('no-back mode treats the boundary as both min and max and snaps back to the
   expect(status.navigation.canGoLeft).toBe(false);
 });
 
+test('no-back mode blocks same-h fragment rewind and vertical up from the last allowed position', async ({ page }) => {
+  await configureHarness(page, {
+    revealOptions: {
+      iframeSync: {
+        studentCanNavigateBack: false,
+      },
+    },
+  });
+
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
+  expect(status.navigation.canGoBack).toBe(false);
+  expect(status.navigation.canGoUp).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.prev();
+  });
+
+  await page.waitForTimeout(50);
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
+  expect(status.navigation.canGoBack).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 1 && status.indices.f === -1;
+  });
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
+  expect(status.navigation.canGoUp).toBe(false);
+  expect(status.navigation.canGoBack).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.prev();
+  });
+
+  await page.waitForTimeout(50);
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
+  expect(status.navigation.canGoUp).toBe(false);
+  expect(status.navigation.canGoBack).toBe(false);
+});
+
 test('student keyboard map enables only allowed directions and blocks overview keys', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
