@@ -484,6 +484,7 @@
       && current.h > nextBoundary.h;
     ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
     const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
+    let lastAllowedTarget = current;
 
     // Notify the storyboard so it can display the boundary marker for all roles.
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
@@ -494,13 +495,20 @@
       if (options.syncToBoundary) {
         // Jump student to the boundary slide.
         ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
+        lastAllowedTarget = snapTarget;
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
         if (current.h > nextBoundary.h) {
           ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
+          lastAllowedTarget = snapTarget;
         }
       }
     }
+
+    // Reset the allowed-position cache for each explicit boundary session so a
+    // later snap-back cannot reuse a stale v/f location from an older boundary
+    // on the same horizontal slide.
+    ctx.state.lastAllowedStudentIndices = normalizeIndices(lastAllowedTarget);
 
     // Update navigation controls to reflect new boundary.
     updateNavigationControls(ctx);
@@ -519,6 +527,7 @@
     ctx.state.hasExplicitBoundary = false;
     ctx.state.boundaryIsLocal = false;
     ctx.state.exactStudentMaxIndices = null;
+    ctx.state.lastAllowedStudentIndices = null;
     ctx.state.releaseStartH = null;
     ctx.state.releaseEndH = null;
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
