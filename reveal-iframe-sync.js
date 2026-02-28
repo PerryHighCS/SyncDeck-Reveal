@@ -203,10 +203,11 @@
     const hasBackwardFragment = hasBackwardFragmentStep(ctx.deck);
     const hasForwardFragment = hasForwardFragmentStep(ctx.deck);
 
-    // Treat fragments as part of linear prev/next progression, but keep
-    // horizontal left/right routes separate from vertical stack movement.
-    let canGoBack = allowBackward && (routes.hasLeft || hasBackwardFragment);
-    let canGoForward = allowForward && (routes.hasRight || hasForwardFragment);
+    // Treat Reveal prev/next as generic linear progression, which includes
+    // fragments and vertical stack movement. Keep left/right separate so
+    // horizontal controls can still honor horizontal boundaries exactly.
+    let canGoBack = allowBackward && (routes.hasLeft || routes.hasUp || hasBackwardFragment);
+    let canGoForward = allowForward && (routes.hasRight || routes.hasDown || hasForwardFragment);
     let canGoLeft = allowBackward && routes.hasLeft;
     let canGoRight = allowForward && routes.hasRight;
     let canGoUp = routes.hasUp;
@@ -221,7 +222,7 @@
           canGoLeft = false;
           canGoUp = false;
         } else if (current.h === boundaryH) {
-          canGoBack = canGoBack && hasBackwardFragment;
+          canGoBack = canGoBack && (routes.hasUp || hasBackwardFragment);
           canGoLeft = false;
           canGoUp = canGoUp && routes.hasUp;
         }
@@ -233,7 +234,7 @@
           canGoRight = false;
           canGoDown = false;
         } else if (current.h === boundaryH) {
-          canGoForward = canGoForward && hasForwardFragment;
+          canGoForward = canGoForward && (routes.hasDown || hasForwardFragment);
           canGoRight = false;
           canGoDown = canGoDown && routes.hasDown;
         }

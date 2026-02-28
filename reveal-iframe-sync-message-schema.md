@@ -320,8 +320,8 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
 - `current`: current slide indices in the iframe.
 - `minIndices`: effective lower bound (usually `null`; equals boundary when back nav is disallowed).
 - `maxIndices`: effective upper bound (boundary when forward nav is restricted).
-- `canGoBack`: final boolean for generic "previous" progression. Includes fragment rewind within the current slide, but not vertical stack movement.
-- `canGoForward`: final boolean for generic "next" progression. Includes fragment advance within the current slide, but not vertical stack movement.
+- `canGoBack`: final boolean for generic "previous" progression. Includes fragment rewind and vertical stack movement when Reveal `prev()` would use them.
+- `canGoForward`: final boolean for generic "next" progression. Includes fragment advance and vertical stack movement when Reveal `next()` would use them.
 - `canGoLeft` / `canGoRight`: strictly horizontal movement availability for left/right arrows, host controls, and horizontal swipe gestures. These exclude fragment progression and vertical stack movement.
 - `canGoUp` / `canGoDown`: vertical stack movement availability inside the current horizontal position. These remain independently useful when the student is at the boundary `h` and still allowed to browse a vertical stack.
 
