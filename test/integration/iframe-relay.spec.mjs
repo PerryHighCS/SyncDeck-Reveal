@@ -35,6 +35,10 @@ test.describe('iframe host relay behavior', () => {
     await page.evaluate(() => window.__hostHarness.clearMessages());
   }
 
+  function findMessage(messages, action) {
+    return messages.find((entry) => entry.data?.action === action);
+  }
+
   async function postCommand(page, name, payload = {}) {
     await page.evaluate(
       ({ commandName, commandPayload }) => {
@@ -58,8 +62,8 @@ test.describe('iframe host relay behavior', () => {
     });
 
     let messages = await hostMessages(page);
-    const roleChanged = messages.find((entry) => entry.data?.action === 'roleChanged');
-    const ready = messages.find((entry) => entry.data?.action === 'ready');
+    const roleChanged = findMessage(messages, 'roleChanged');
+    const ready = findMessage(messages, 'ready');
     expect(roleChanged.data.role).toBe('student');
     expect(roleChanged.data.payload).toEqual({ role: 'student' });
     expect(ready.data.payload.role).toBe('student');
@@ -72,7 +76,7 @@ test.describe('iframe host relay behavior', () => {
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.payload?.reason === 'storyboardChanged'));
 
     messages = await hostMessages(page);
-    const state = messages.find((entry) => entry.data?.action === 'state');
+    const state = findMessage(messages, 'state');
     expect(state.data.role).toBe('student');
     expect(state.data.payload.reason).toBe('storyboardChanged');
     expect(state.data.payload.overview).toBe(true);
@@ -101,12 +105,88 @@ test.describe('iframe host relay behavior', () => {
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.payload?.reason === 'requestState'));
 
     const messages = await hostMessages(page);
-    const response = messages.find((entry) => entry.data?.action === 'state');
+    const response = findMessage(messages, 'state');
     expect(response.data.role).toBe('student');
     expect(response.data.payload.reason).toBe('requestState');
     expect(response.data.payload.indices).toEqual({ h: 1, v: 0, f: -1 });
     expect(response.data.payload.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
     expect(response.data.payload.releasedRegion).toEqual({ startH: 0, endH: 1 });
+  });
+
+  test('host receives instructor boundary changes from storyboard actions', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'instructor' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'ready'));
+
+    await clearHostMessages(page);
+
+    await page.frameLocator('#deck-frame').locator('#storyboard-track .story-thumb-wrap').nth(2).locator('.story-boundary-btn').click();
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'studentBoundaryChanged');
+    });
+
+    let messages = await hostMessages(page);
+    let boundaryChanged = findMessage(messages, 'studentBoundaryChanged');
+    expect(boundaryChanged.data.role).toBe('instructor');
+    expect(boundaryChanged.data.payload).toEqual({
+      reason: 'instructorSet',
+      studentBoundary: { h: 2, v: 0, f: -1 },
+    });
+
+    await clearHostMessages(page);
+
+    await page.frameLocator('#deck-frame').locator('#storyboard-track .story-thumb-wrap').nth(2).locator('.story-boundary-btn').click();
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'studentBoundaryChanged');
+    });
+
+    messages = await hostMessages(page);
+    boundaryChanged = findMessage(messages, 'studentBoundaryChanged');
+    expect(boundaryChanged.data.role).toBe('instructor');
+    expect(boundaryChanged.data.payload).toEqual({
+      reason: 'instructorCleared',
+      studentBoundary: null,
+    });
+  });
+
+  test('host receives pong, warning, and storyboard state when setState carries overview', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'ready'));
+
+    await clearHostMessages(page);
+    await postCommand(page, 'ping');
+    await postCommand(page, 'notARealCommand');
+    await postCommand(page, 'setState', {
+      state: { indexh: 1, indexv: 1, indexf: -1, overview: true },
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'pong')
+        && messages.some((entry) => entry.data?.action === 'warn')
+        && messages.some((entry) => entry.data?.action === 'state' && entry.data?.payload?.reason === 'storyboardChanged');
+    });
+
+    const messages = await hostMessages(page);
+    const pong = findMessage(messages, 'pong');
+    const warn = findMessage(messages, 'warn');
+    const storyboardState = messages.find((entry) => entry.data?.action === 'state' && entry.data?.payload?.reason === 'storyboardChanged');
+
+    expect(pong.data.payload).toEqual({ ok: true });
+    expect(warn.data.payload).toEqual({ message: 'Unknown command: notARealCommand' });
+    expect(storyboardState.data.payload.overview).toBe(true);
+    expect(storyboardState.data.payload.indices).toEqual({ h: 1, v: 1, f: -1 });
   });
 
   test('host receives chalkboard sync events from instructor iframe', async ({ page }) => {
@@ -132,7 +212,7 @@ test.describe('iframe host relay behavior', () => {
     });
 
     let messages = await hostMessages(page);
-    const initialState = messages.find((entry) => entry.data?.action === 'chalkboardState');
+    const initialState = findMessage(messages, 'chalkboardState');
     expect(initialState.data.payload.storage).toEqual({ board: 'snapshot' });
 
     await clearHostMessages(page);
@@ -157,7 +237,7 @@ test.describe('iframe host relay behavior', () => {
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'chalkboardStroke'));
 
     messages = await hostMessages(page);
-    const stroke = messages.find((entry) => entry.data?.action === 'chalkboardStroke');
+    const stroke = findMessage(messages, 'chalkboardStroke');
     expect(stroke.data.payload).toEqual({
       mode: 1,
       slide: { h: 0, v: 0, f: -1 },
@@ -170,7 +250,59 @@ test.describe('iframe host relay behavior', () => {
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'chalkboardState'));
 
     messages = await hostMessages(page);
-    const requestedState = messages.find((entry) => entry.data?.action === 'chalkboardState');
+    const requestedState = findMessage(messages, 'chalkboardState');
     expect(requestedState.data.payload.storage).toEqual({ board: 'snapshot' });
+  });
+
+  test('host receives chalkboard erase strokes and slide-change snapshots from instructor iframe', async ({ page }) => {
+    await page.addInitScript(() => {
+      const snapshots = [{ board: 'initial' }, { board: 'after-slide-change' }];
+      window.RevealChalkboard = {
+        getData() {
+          return snapshots.shift() || { board: 'exhausted' };
+        },
+      };
+    });
+
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'instructor' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'chalkboardState'));
+
+    await clearHostMessages(page);
+
+    await page.frameLocator('#deck-frame').locator('body').evaluate(() => {
+      const eraseEvent = new CustomEvent('broadcast');
+      eraseEvent.content = {
+        sender: 'chalkboard-plugin',
+        type: 'erase',
+        mode: 2,
+        board: 1,
+        x: 55,
+        y: 89,
+        timestamp: 144,
+      };
+      document.dispatchEvent(eraseEvent);
+      window.Reveal.next();
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'chalkboardStroke')
+        && messages.some((entry) => entry.data?.action === 'chalkboardState');
+    });
+
+    const messages = await hostMessages(page);
+    const eraseStroke = findMessage(messages, 'chalkboardStroke');
+    const flushedState = findMessage(messages, 'chalkboardState');
+
+    expect(eraseStroke.data.payload).toEqual({
+      mode: 2,
+      slide: { h: 0, v: 0, f: -1 },
+      event: { type: 'erase', x: 55, y: 89, board: 1, time: 144 },
+    });
+    expect(flushedState.data.payload.storage).toEqual({ board: 'after-slide-change' });
   });
 });
