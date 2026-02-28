@@ -450,10 +450,12 @@
   }
 
   function captureStudentBoundary(ctx) {
-    const current = normalizeBoundaryIndices(ctx.deck.getIndices());
-    ctx.state.studentMaxIndices = current;
-    ctx.state.releaseStartH = current.h;
-    ctx.state.releaseEndH = current.h;
+    const current = normalizeIndices(ctx.deck.getIndices());
+    const boundary = normalizeBoundaryIndices(current);
+    ctx.state.studentMaxIndices = boundary;
+    ctx.state.lastAllowedStudentIndices = current;
+    ctx.state.releaseStartH = boundary.h;
+    ctx.state.releaseEndH = boundary.h;
   }
 
   /** Default boundary for a student before the instructor has progressed. */
