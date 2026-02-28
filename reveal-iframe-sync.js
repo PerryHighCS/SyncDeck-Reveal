@@ -21,6 +21,7 @@
 
 (function () {
   const IFRAME_SYNC_VERSION = '1.1.0';
+  const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
 
   const DEFAULTS = {
     role: 'student',
@@ -60,6 +61,40 @@
     if (!window.parent || window.parent === window) return;
     const message = buildMessage(ctx, action, payload);
     window.parent.postMessage(message, normalizeOrigin(ctx.config.hostOrigin));
+  }
+
+  function ensureNavLockStyles() {
+    if (document.getElementById(NAV_LOCK_STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = NAV_LOCK_STYLE_ID;
+    style.textContent = `
+      .reveal .controls .navigate-left.disabled,
+      .reveal .controls .navigate-right.disabled,
+      .reveal .controls .navigate-left[aria-disabled="true"],
+      .reveal .controls .navigate-right[aria-disabled="true"] {
+        animation: none !important;
+        transform: none !important;
+      }
+
+      .reveal .controls .navigate-left.disabled .controls-arrow,
+      .reveal .controls .navigate-right.disabled .controls-arrow,
+      .reveal .controls .navigate-left[aria-disabled="true"] .controls-arrow,
+      .reveal .controls .navigate-right[aria-disabled="true"] .controls-arrow {
+        animation: none !important;
+        transform: none !important;
+        transition: none !important;
+      }
+
+      .reveal .controls .navigate-left.disabled.highlight,
+      .reveal .controls .navigate-right.disabled.highlight,
+      .reveal .controls .navigate-left[aria-disabled="true"].highlight,
+      .reveal .controls .navigate-right[aria-disabled="true"].highlight {
+        animation: none !important;
+      }
+    `;
+
+    document.head.appendChild(style);
   }
 
   function currentDeckState(deck) {
@@ -154,6 +189,8 @@
   }
 
   function updateNavigationControls(ctx) {
+    ensureNavLockStyles();
+
     const nav = buildNavigationStatus(ctx);
     const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
 
@@ -174,12 +211,18 @@
         rightButton.setAttribute('aria-disabled', blockForward ? 'true' : 'false');
         rightButton.style.pointerEvents = blockForward ? 'none' : '';
         rightButton.style.opacity = blockForward ? '0.18' : '';
+        if (blockForward) {
+          rightButton.classList.remove('highlight');
+        }
       }
 
       if (leftButton) {
         leftButton.setAttribute('aria-disabled', blockBack ? 'true' : 'false');
         leftButton.style.pointerEvents = blockBack ? 'none' : '';
         leftButton.style.opacity = blockBack ? '0.18' : '';
+        if (blockBack) {
+          leftButton.classList.remove('highlight');
+        }
       }
     };
 
