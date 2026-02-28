@@ -129,8 +129,10 @@ Allows a student to move forward up to the specified boundary, even if instructo
 Notes:
 - Once an explicit boundary is set, instructor sync commands (`setState`, `slide`, `next`, `prev`) no longer auto-advance the boundary. Only a new `allowStudentForwardTo` / `setStudentBoundary` call will change it.
 - If the student is already **past** the new boundary when it is received, they are immediately rubber-banded back to it.
+- Boundary enforcement is horizontal-only. `v` / `f` may still be present in payloads for compatibility, but the runtime canonicalizes stored boundaries to `{ h, v: 0, f: -1 }`.
+- Because boundary enforcement is horizontal-only, students may continue moving within vertical child slides and fragments at the boundary `h` position.
 - Navigation enforcement (preventing forward travel) applies only when role is `student`.
-- When sent to an **instructor** iframe, the boundary is stored and shown as a visual marker in the storyboard strip (display only — the instructor can still navigate freely). A `studentBoundaryChanged` message is still emitted with `role: "instructor"`.
+- When sent to an **instructor** iframe, the boundary is stored and shown as a visual marker in the storyboard strip together with the released-range highlight (display only — the instructor can still navigate freely). A `studentBoundaryChanged` message is still emitted with `role: "instructor"`.
 - With default plugin settings (`studentCanNavigateBack: true`, `studentCanNavigateForward: false`), student can move backward and forward only up to the granted boundary.
 - `syncToBoundary: true` also jumps the student immediately to that location (ignored for instructor role).
 
@@ -288,12 +290,15 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
       "canNavigateForward": false
     },
     "studentBoundary": { "h": 2, "v": 0, "f": 0 },
+    "releasedRegion": { "startH": 0, "endH": 2 },
     "navigation": {
       "current": { "h": 2, "v": 0, "f": 0 },
       "minIndices": null,
       "maxIndices": { "h": 2, "v": 0, "f": 0 },
       "canGoBack": true,
-      "canGoForward": false
+      "canGoForward": false,
+      "canGoUp": false,
+      "canGoDown": true
     },
     "revealState": {},
     "indices": { "h": 2, "v": 0, "f": 0 },
@@ -311,6 +316,9 @@ Sent on init (if `autoAnnounceReady`) and when role changes.
 - `maxIndices`: effective upper bound (boundary when forward nav is restricted).
 - `canGoBack`: final boolean for enabling/disabling a host "previous" arrow.
 - `canGoForward`: final boolean for enabling/disabling a host "next" arrow.
+- `canGoUp` / `canGoDown`: vertical movement availability inside the current horizontal position. These remain independently useful when the student is at the boundary `h` and still allowed to browse a vertical stack or remaining fragments.
+
+`releasedRegion` is the instructor/storyboard-facing horizontal min/max range between the current slide `h` and the current boundary `h`. It is primarily used to highlight the active released range in the storyboard.
 
 ### `state`
 
@@ -327,12 +335,15 @@ Sent by **any role** on: slide change, fragment shown/hidden, pause, resume, ove
       "canNavigateForward": true
     },
     "studentBoundary": { "h": 5, "v": 0, "f": 0 },
+    "releasedRegion": { "startH": 4, "endH": 5 },
     "navigation": {
       "current": { "h": 4, "v": 0, "f": 1 },
       "minIndices": null,
       "maxIndices": null,
       "canGoBack": true,
-      "canGoForward": true
+      "canGoForward": true,
+      "canGoUp": false,
+      "canGoDown": false
     },
     "revealState": {},
     "indices": { "h": 4, "v": 0, "f": 1 },
@@ -344,9 +355,11 @@ Sent by **any role** on: slide change, fragment shown/hidden, pause, resume, ove
 
 `overview` reflects whether the **custom storyboard strip** is currently open (`true` = strip is visible).
 
-`studentBoundary` — `null` until a boundary has been established; `{ h, v, f }` once set. Non-null for **both student and instructor** roles once a boundary is in effect. For instructors this reflects the boundary currently displayed in the storyboard strip. Cleared to `null` when `clearBoundary` command is received.
+`studentBoundary` — `null` until a boundary has been established; `{ h, v, f }` once set. Non-null for **both student and instructor** roles once a boundary is in effect. For instructors this reflects the boundary currently displayed in the storyboard strip. Cleared to `null` when `clearBoundary` command is received. The runtime currently treats this boundary as horizontal-only and canonicalizes it to `{ h, v: 0, f: -1 }`.
 
 `boundaryIsLocal` — `true` when this iframe set the boundary itself (via the storyboard ⚑ button) rather than receiving it from the host. The storyboard uses this to skip forward-navigation restrictions for the acting instructor even if their role hasn't been upgraded to `"instructor"` yet.
+
+Storyboard note: `reveal-storyboard.js` now renders vertical stacks as grouped horizontal entries with child-slide buttons so the active child slide remains visible while the boundary and released region still operate on the parent horizontal `h`.
 
 ### `roleChanged`
 

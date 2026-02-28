@@ -6,6 +6,14 @@
     toggleKey: 'm',
   };
 
+  function normalizeIndices(indices) {
+    return {
+      h: Number(indices?.h ?? 0),
+      v: Number(indices?.v ?? 0),
+      f: Number(indices?.f ?? -1),
+    };
+  }
+
   function getSlideLabel(section, index) {
     const heading = section.querySelector('h1, h2, h3');
     const text = heading ? heading.textContent.trim() : `Slide ${index + 1}`;
@@ -65,6 +73,7 @@
 
     // ── Boundary state ──────────────────────────────────────────────────────
     let currentBoundaryIndex = null;
+    let currentReleasedRange = null;
     let liveRegion;
 
     function getRole() {
@@ -78,6 +87,7 @@
       style.id = 'reveal-storyboard-boundary-css';
       style.textContent = [
         '.story-thumb-wrap { position: relative; display: inline-flex; flex-shrink: 0; }',
+        '.story-thumb-wrap.story-stack-wrap { flex-direction: column; gap: 6px; }',
         '.story-boundary-btn {',
         '  position: absolute; bottom: 4px; right: 4px;',
         '  width: 22px; height: 22px;',
@@ -96,6 +106,46 @@
         '.story-thumb-wrap.story-thumb-boundary .story-thumb {',
         '  border-color: var(--amber, #f90) !important;',
         '  box-shadow: 0 0 0 1px rgba(255,153,0,0.35) inset;',
+        '}',
+        '.story-thumb-wrap.story-thumb-released .story-thumb {',
+        '  box-shadow: 0 0 0 8px rgba(0,200,160,0.34) inset;',
+        '  border-color: rgba(0,200,160,0.78);',
+        '}',
+        '.story-thumb-wrap.story-thumb-release-start .story-thumb {',
+        '  box-shadow: 0 0 0 16px rgba(0,200,160,0.40) inset;',
+        '}',
+        '.story-thumb-wrap.story-thumb-release-end .story-thumb {',
+        '  box-shadow: 0 0 0 16px rgba(0,200,160,0.40) inset;',
+        '}',
+        '.story-thumb-wrap.story-stack-wrap .story-thumb {',
+        '  margin-bottom: 0;',
+        '}',
+        '.story-stack-badge {',
+        '  position: absolute; top: 6px; right: 6px;',
+        '  z-index: 2; padding: 2px 6px; border-radius: 999px;',
+        '  background: rgba(0,0,0,0.65); color: #d5f5ff;',
+        '  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;',
+        '}',
+        '.story-stack-meta {',
+        '  display: inline-flex; margin-left: 6px; opacity: 0.72;',
+        '  font-size: 11px;',
+        '}',
+        '.story-stack-children {',
+        '  display: flex; gap: 4px; flex-wrap: wrap; max-width: 100%;',
+        '}',
+        '.story-stack-child {',
+        '  min-width: 26px; height: 24px; padding: 0 8px;',
+        '  border-radius: 999px; border: 1px solid rgba(255,255,255,0.18);',
+        '  background: rgba(255,255,255,0.08); color: inherit;',
+        '  cursor: pointer; font-size: 11px;',
+        '}',
+        '.story-stack-child:hover, .story-stack-child:focus {',
+        '  border-color: rgba(255,255,255,0.42);',
+        '  background: rgba(255,255,255,0.14);',
+        '}',
+        '.story-stack-child.active {',
+        '  background: rgba(0,255,255,0.18);',
+        '  border-color: var(--cyan, #0ff);',
         '}',
       ].join('\n');
       document.head.appendChild(style);
@@ -124,22 +174,49 @@
     }
 
     // Update the boundary marker visuals and announce the change.
+    function applyStoryboardRangeClasses() {
+      storyboardTrack.querySelectorAll('.story-thumb-wrap').forEach((wrap) => {
+        const slideH = Number(wrap.dataset.slideH ?? wrap.dataset.slide);
+        const isBoundary = currentBoundaryIndex !== null && slideH === currentBoundaryIndex;
+        const isReleased = currentReleasedRange
+          && slideH >= currentReleasedRange.startH
+          && slideH <= currentReleasedRange.endH;
+        const isReleaseStart = currentReleasedRange && slideH === currentReleasedRange.startH;
+        const isReleaseEnd = currentReleasedRange && slideH === currentReleasedRange.endH;
+
+        wrap.classList.toggle('story-thumb-boundary', isBoundary);
+        wrap.classList.toggle('story-thumb-released', !!isReleased);
+        wrap.classList.toggle('story-thumb-release-start', !!isReleaseStart);
+        wrap.classList.toggle('story-thumb-release-end', !!isReleaseEnd);
+
+        const btn = wrap.querySelector('.story-boundary-btn');
+        if (btn) btn.setAttribute('aria-pressed', isBoundary ? 'true' : 'false');
+      });
+    }
+
     function updateBoundaryMarker(index) {
       currentBoundaryIndex = (index != null && Number.isFinite(Number(index)))
         ? Number(index)
         : null;
 
-      storyboardTrack.querySelectorAll('.story-thumb-wrap').forEach((wrap) => {
-        const isBoundary = currentBoundaryIndex !== null
-          && Number(wrap.dataset.slide) === currentBoundaryIndex;
-        wrap.classList.toggle('story-thumb-boundary', isBoundary);
-        const btn = wrap.querySelector('.story-boundary-btn');
-        if (btn) btn.setAttribute('aria-pressed', isBoundary ? 'true' : 'false');
-      });
+      applyStoryboardRangeClasses();
 
       if (currentBoundaryIndex !== null && liveRegion) {
         liveRegion.textContent = `Student boundary set to slide ${currentBoundaryIndex + 1}`;
       }
+    }
+
+    function updateReleasedRange(range) {
+      if (range && Number.isFinite(Number(range.startH)) && Number.isFinite(Number(range.endH))) {
+        currentReleasedRange = {
+          startH: Number(range.startH),
+          endH: Number(range.endH),
+        };
+      } else {
+        currentReleasedRange = null;
+      }
+
+      applyStoryboardRangeClasses();
     }
 
     injectBoundaryStyles();
@@ -147,6 +224,50 @@
 
     // ── Slide data ──────────────────────────────────────────────────────────
     const slideSections = Array.from(document.querySelectorAll('.reveal .slides > section'));
+
+    function getChildSections(section) {
+      return Array.from(section.children).filter((node) => node.tagName === 'SECTION');
+    }
+
+    function getStoryboardEntries() {
+      return slideSections.map((section, h) => {
+        const childSections = getChildSections(section);
+        const isStack = childSections.length > 0;
+        return {
+          h,
+          section,
+          isStack,
+          childSections: isStack ? childSections : [section],
+        };
+      });
+    }
+
+    function getSyncStatus() {
+      const syncApi = window.RevealIframeSyncAPI;
+      if (!syncApi || typeof syncApi.getStatus !== 'function') return null;
+      return syncApi.getStatus();
+    }
+
+    function getReleasedRange(status) {
+      const explicitRange = status?.releasedRegion;
+      if (explicitRange && Number.isFinite(Number(explicitRange.startH)) && Number.isFinite(Number(explicitRange.endH))) {
+        return {
+          startH: Number(explicitRange.startH),
+          endH: Number(explicitRange.endH),
+        };
+      }
+
+      if (!status?.studentBoundary) return null;
+
+      const boundaryH = Number(status.studentBoundary.h);
+      const currentH = Number(status.indices?.h ?? reveal.getIndices().h ?? 0);
+      if (!Number.isFinite(boundaryH) || !Number.isFinite(currentH)) return null;
+
+      return {
+        startH: Math.min(currentH, boundaryH),
+        endH: Math.max(currentH, boundaryH),
+      };
+    }
 
     function getAllowedMaxSlideIndex() {
       const lastIndex = Math.max(0, slideSections.length - 1);
@@ -179,39 +300,89 @@
       storyboardTrack.setAttribute('role', 'group');
       storyboardTrack.setAttribute('aria-label', 'Slide storyboard');
 
+      const status = getSyncStatus();
+      const activeIndices = normalizeIndices(reveal.getIndices());
+      const entries = getStoryboardEntries();
       const allowedMaxIndex = getAllowedMaxSlideIndex();
-      const hiddenCount = Math.max(0, slideSections.length - (allowedMaxIndex + 1));
+      const hiddenCount = Math.max(0, entries.length - (allowedMaxIndex + 1));
       const isInstructor = getRole() === 'instructor';
 
-      slideSections.forEach((section, index) => {
-        if (index > allowedMaxIndex) return;
+      entries.forEach((entry) => {
+        if (entry.h > allowedMaxIndex) return;
 
         // Wrapper div — holds nav button + optional boundary button.
         // data-slide on the wrapper is read by updateBoundaryMarker.
         const wrap = document.createElement('div');
-        wrap.className = 'story-thumb-wrap';
-        wrap.dataset.slide = String(index);
+        wrap.className = `story-thumb-wrap${entry.isStack ? ' story-stack-wrap' : ''}`;
+        wrap.dataset.slide = String(entry.h);
+        wrap.dataset.slideH = String(entry.h);
+
+        const previewV = (entry.isStack && activeIndices.h === entry.h)
+          ? Math.max(0, Math.min(entry.childSections.length - 1, activeIndices.v))
+          : 0;
+        const previewSection = entry.childSections[previewV] || entry.childSections[0];
 
         // Navigation button (data-slide kept here too for updateStoryboardActive compat).
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'story-thumb';
-        button.dataset.slide = String(index);
-        button.setAttribute('aria-label', `Go to ${getSlideLabel(section, index)}`);
+        button.dataset.slide = String(entry.h);
+        button.dataset.slideH = String(entry.h);
+        button.setAttribute('aria-label', `Go to ${getSlideLabel(previewSection, entry.h)}`);
 
         const num = document.createElement('span');
         num.className = 'story-num';
-        num.textContent = String(index + 1).padStart(2, '0');
+        num.textContent = String(entry.h + 1).padStart(2, '0');
 
         const caption = document.createElement('span');
         caption.className = 'story-caption';
-        caption.textContent = getSlideLabel(section, index);
+        caption.textContent = getSlideLabel(previewSection, entry.h);
 
         button.appendChild(num);
-        button.appendChild(createSlidePreview(section));
+        button.appendChild(createSlidePreview(previewSection));
         button.appendChild(caption);
-        button.addEventListener('click', () => reveal.slide(index));
+        if (entry.isStack) {
+          const badge = document.createElement('span');
+          badge.className = 'story-stack-badge';
+          badge.textContent = 'Stack';
+          button.appendChild(badge);
+
+          const meta = document.createElement('span');
+          meta.className = 'story-stack-meta';
+          meta.textContent = `${entry.childSections.length} slides`;
+          caption.appendChild(meta);
+        }
+        button.addEventListener('click', () => {
+          const currentIndices = normalizeIndices(reveal.getIndices());
+          const targetV = currentIndices.h === entry.h ? currentIndices.v : 0;
+          reveal.slide(entry.h, entry.isStack ? targetV : 0);
+        });
         wrap.appendChild(button);
+
+        if (entry.isStack) {
+          const childRail = document.createElement('div');
+          childRail.className = 'story-stack-children';
+          childRail.setAttribute('role', 'group');
+          childRail.setAttribute('aria-label', `Slides in stack ${entry.h + 1}`);
+
+          entry.childSections.forEach((childSection, v) => {
+            const childButton = document.createElement('button');
+            childButton.type = 'button';
+            childButton.className = 'story-stack-child';
+            childButton.dataset.slideH = String(entry.h);
+            childButton.dataset.slideV = String(v);
+            childButton.textContent = String(v + 1);
+            childButton.title = getSlideLabel(childSection, entry.h);
+            childButton.setAttribute('aria-label', `Go to ${getSlideLabel(childSection, entry.h)}`);
+            childButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              reveal.slide(entry.h, v);
+            });
+            childRail.appendChild(childButton);
+          });
+
+          wrap.appendChild(childRail);
+        }
 
         // Boundary button — instructor only. Not rendered for students so
         // there is nothing to accidentally activate.
@@ -219,15 +390,15 @@
           const boundaryBtn = document.createElement('button');
           boundaryBtn.type = 'button';
           boundaryBtn.className = 'story-boundary-btn';
-          boundaryBtn.setAttribute('aria-label', `Set student boundary to slide ${index + 1}`);
+          boundaryBtn.setAttribute('aria-label', `Set student boundary to slide ${entry.h + 1}`);
           boundaryBtn.setAttribute('aria-pressed', 'false');
           boundaryBtn.textContent = '\u2691'; // ⚑ flag
           boundaryBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             // Toggle: clicking the active boundary slide clears it.
-            const isClear = currentBoundaryIndex === index;
+            const isClear = currentBoundaryIndex === entry.h;
             window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-moved', {
-              detail: isClear ? { indices: null } : { indices: { h: index, v: 0, f: 0 } },
+              detail: isClear ? { indices: null } : { indices: { h: entry.h, v: 0, f: 0 } },
             }));
           });
           wrap.appendChild(boundaryBtn);
@@ -259,15 +430,25 @@
         storyboardTrack.appendChild(lockedCard);
       }
 
+      updateReleasedRange(getReleasedRange(status));
+
       // Reapply boundary marker after re-render (handles role-change refreshes).
       if (currentBoundaryIndex !== null) updateBoundaryMarker(currentBoundaryIndex);
     }
 
-    function updateStoryboardActive(index) {
+    function updateStoryboardActive(indices) {
+      const active = normalizeIndices(indices);
       const thumbs = storyboardTrack.querySelectorAll('.story-thumb');
       thumbs.forEach((thumb) => {
-        const slideIndex = Number(thumb.dataset.slide);
-        thumb.classList.toggle('active', slideIndex === index);
+        const slideH = Number(thumb.dataset.slideH ?? thumb.dataset.slide);
+        thumb.classList.toggle('active', slideH === active.h);
+      });
+
+      const childButtons = storyboardTrack.querySelectorAll('.story-stack-child');
+      childButtons.forEach((button) => {
+        const slideH = Number(button.dataset.slideH);
+        const slideV = Number(button.dataset.slideV);
+        button.classList.toggle('active', slideH === active.h && slideV === active.v);
       });
 
       const activeThumb = storyboardTrack.querySelector('.story-thumb.active');
@@ -288,13 +469,14 @@
 
     function refreshStoryboard() {
       renderStoryboard();
-      updateStoryboardActive(reveal.getIndices().h || 0);
+      updateStoryboardActive(reveal.getIndices());
     }
 
     refreshStoryboard();
 
     reveal.on('slidechanged', (event) => {
-      updateStoryboardActive(event.indexh);
+      updateStoryboardActive({ h: event.indexh, v: event.indexv, f: -1 });
+      updateReleasedRange(getReleasedRange(getSyncStatus()));
     });
 
     window.addEventListener('reveal-iframesync-status', () => {

@@ -106,6 +106,15 @@
     };
   }
 
+  function normalizeBoundaryIndices(indices) {
+    const next = normalizeIndices(indices);
+    return {
+      h: next.h,
+      v: 0,
+      f: -1,
+    };
+  }
+
   function compareIndices(a, b) {
     const left = normalizeIndices(a);
     const right = normalizeIndices(b);
@@ -126,24 +135,62 @@
 
   function getStudentBoundary(ctx) {
     if (!ctx.state.studentMaxIndices) return null;
-    return normalizeIndices(ctx.state.studentMaxIndices);
+    return normalizeBoundaryIndices(ctx.state.studentMaxIndices);
   }
 
-  function getLinearRoutes(deck) {
+  function getDirectionalRoutes(deck) {
+    const routes = (typeof deck.availableRoutes === 'function')
+      ? (deck.availableRoutes() || {})
+      : {};
     const hasPrev = (typeof deck.hasPrevious === 'function')
       ? !!deck.hasPrevious()
-      : true;
+      : !!(routes.left || routes.up);
     const hasNext = (typeof deck.hasNext === 'function')
       ? !!deck.hasNext()
-      : true;
-    return { hasPrev, hasNext };
+      : !!(routes.right || routes.down);
+    return {
+      hasPrev,
+      hasNext,
+      hasLeft: !!routes.left,
+      hasRight: !!routes.right,
+      hasUp: !!routes.up,
+      hasDown: !!routes.down,
+    };
+  }
+
+  function hasForwardStepWithinCurrentHorizontal(deck) {
+    const routes = getDirectionalRoutes(deck);
+    if (routes.hasDown) return true;
+
+    const currentSlide = deck.getCurrentSlide?.();
+    if (!currentSlide) return false;
+    return !!currentSlide.querySelector('.fragment:not(.visible)');
+  }
+
+  function hasBackwardStepWithinCurrentHorizontal(deck) {
+    const routes = getDirectionalRoutes(deck);
+    if (routes.hasUp) return true;
+
+    const current = normalizeIndices(deck.getIndices());
+    return current.f > -1;
+  }
+
+  function buildReleasedRegion(ctx) {
+    const boundary = getStudentBoundary(ctx);
+    if (!boundary) return null;
+
+    const current = normalizeIndices(ctx.deck.getIndices());
+    return {
+      startH: Math.min(current.h, boundary.h),
+      endH: Math.max(current.h, boundary.h),
+    };
   }
 
   function buildNavigationStatus(ctx) {
     const current = normalizeIndices(ctx.deck.getIndices());
     const roleCaps = getRoleCapabilities(ctx);
     const studentBoundary = getStudentBoundary(ctx);
-    const { hasPrev, hasNext } = getLinearRoutes(ctx.deck);
+    const routes = getDirectionalRoutes(ctx.deck);
 
     let minIndices = null;
     let maxIndices = null;
@@ -159,14 +206,45 @@
       }
     }
 
-    let canGoBack = roleCaps.canNavigateBack && hasPrev;
-    let canGoForward = roleCaps.canNavigateForward && hasNext;
+    const inFollowInstructorMode = !ctx.state.hasExplicitBoundary;
+    const allowBackward = roleCaps.canNavigateBack;
+    const allowForward = ctx.state.role === 'student'
+      ? (ctx.state.hasExplicitBoundary || roleCaps.canNavigateForward)
+      : roleCaps.canNavigateForward;
 
-    if (minIndices) {
-      canGoBack = canGoBack && compareIndices(current, minIndices) > 0;
-    }
-    if (maxIndices) {
-      canGoForward = canGoForward && compareIndices(current, maxIndices) < 0;
+    let canGoBack = allowBackward && routes.hasPrev;
+    let canGoForward = allowForward && routes.hasNext;
+    let canGoUp = routes.hasUp;
+    let canGoDown = routes.hasDown;
+
+    if (ctx.state.role === 'student' && studentBoundary) {
+      const boundaryH = studentBoundary.h;
+
+      if (minIndices) {
+        if (current.h < boundaryH) {
+          canGoBack = false;
+          canGoUp = false;
+        } else if (current.h === boundaryH) {
+          canGoBack = canGoBack && hasBackwardStepWithinCurrentHorizontal(ctx.deck);
+          canGoUp = canGoUp && hasBackwardStepWithinCurrentHorizontal(ctx.deck);
+        }
+      }
+
+      if (maxIndices) {
+        if (current.h > boundaryH) {
+          canGoForward = false;
+          canGoDown = false;
+        } else if (current.h === boundaryH) {
+          const canAdvanceWithinCurrentHorizontal = hasForwardStepWithinCurrentHorizontal(ctx.deck);
+          canGoForward = canGoForward && canAdvanceWithinCurrentHorizontal;
+          canGoDown = canGoDown && canAdvanceWithinCurrentHorizontal;
+        }
+      }
+
+      if (inFollowInstructorMode && current.h >= boundaryH) {
+        canGoForward = false;
+        canGoDown = false;
+      }
     }
 
     return {
@@ -175,6 +253,8 @@
       maxIndices,
       canGoBack,
       canGoForward,
+      canGoUp,
+      canGoDown,
     };
   }
 
@@ -235,7 +315,6 @@
       keyboardMap[37] = 'left';   // left arrow
       keyboardMap[72] = 'left';   // h
       keyboardMap[33] = 'prev';   // page up
-      keyboardMap[38] = 'up';     // up arrow (for vertical slides)
     }
 
     if (nav.canGoForward) {
@@ -243,6 +322,13 @@
       keyboardMap[76] = 'right';  // l
       keyboardMap[34] = 'next';   // page down
       keyboardMap[32] = 'next';   // space
+    }
+
+    if (nav.canGoUp) {
+      keyboardMap[38] = 'up';     // up arrow (for vertical slides)
+    }
+
+    if (nav.canGoDown) {
       keyboardMap[40] = 'down';   // down arrow (for vertical slides)
     }
 
@@ -274,6 +360,7 @@
       role: ctx.state.role,
       capabilities: getRoleCapabilities(ctx),
       studentBoundary: getStudentBoundary(ctx),
+      releasedRegion: buildReleasedRegion(ctx),
       navigation: buildNavigationStatus(ctx),
       // True when this iframe set the boundary locally (via the storyboard
       // boundary button) rather than receiving it from the host. Lets the
@@ -353,7 +440,7 @@
   }
 
   function captureStudentBoundary(ctx) {
-    ctx.state.studentMaxIndices = normalizeIndices(ctx.deck.getIndices());
+    ctx.state.studentMaxIndices = normalizeBoundaryIndices(ctx.deck.getIndices());
   }
 
   /** Default boundary for a student before the instructor has progressed. */
@@ -364,7 +451,7 @@
   function setStudentBoundary(ctx, indices, options = {}) {
     if (!indices) return false;
 
-    const nextBoundary = normalizeIndices(indices);
+    const nextBoundary = normalizeBoundaryIndices(indices);
     ctx.state.studentMaxIndices = nextBoundary;
     ctx.state.hasExplicitBoundary = true;
 
@@ -384,7 +471,7 @@
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
         const current = normalizeIndices(ctx.deck.getIndices());
-        if (compareIndices(current, nextBoundary) > 0) {
+        if (current.h > nextBoundary.h) {
           ctx.deck.slide(nextBoundary.h, nextBoundary.v, nextBoundary.f);
         }
       }
@@ -429,8 +516,7 @@
     if (!ctx.state.studentMaxIndices) return;
 
     const current = normalizeIndices(ctx.deck.getIndices());
-    const max = normalizeIndices(ctx.state.studentMaxIndices);
-    const delta = compareIndices(current, max);
+    const max = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
 
     const canGoBack = !!ctx.config.studentCanNavigateBack;
     // An explicit boundary (allowStudentForwardTo / setStudentBoundary) always
@@ -441,8 +527,8 @@
       : !!ctx.config.studentCanNavigateForward;
 
     let shouldReset = false;
-    if (!canGoForward && delta > 0) shouldReset = true;
-    if (!canGoBack && delta < 0) shouldReset = true;
+    if (!canGoForward && current.h > max.h) shouldReset = true;
+    if (!canGoBack && current.h < max.h) shouldReset = true;
 
     if (!shouldReset) return;
 
