@@ -170,6 +170,146 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
   expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
 });
 
+test('same-h fragment pullback exact-locks to the requested fragment and clears on boundary replacement', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: false,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.canGoForward).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForTimeout(50);
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.canGoForward).toBe(false);
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 2, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: false,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.studentBoundary?.h === 2
+      && status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
+  });
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.studentBoundary).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
+  expect(status.navigation.maxIndices).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.canGoForward).toBe(true);
+});
+
+test('same-h vertical pullback exact-locks to the requested stack child', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 1 && status.indices.f === -1;
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: false,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.canGoDown).toBe(false);
+  expect(status.navigation.canGoForward).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForTimeout(50);
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.canGoDown).toBe(false);
+  expect(status.navigation.canGoForward).toBe(false);
+});
+
 test('no-back mode treats the boundary as both min and max and snaps back to the last allowed position', async ({ page }) => {
   await configureHarness(page, {
     revealOptions: {

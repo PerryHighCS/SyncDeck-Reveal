@@ -69,6 +69,32 @@ test('student explicit boundary updates status, navigation, and released storybo
   await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(1)).toHaveClass(/story-thumb-release-end/);
 });
 
+test('standalone and instructor roles do not show a phantom boundary marker', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.role).toBe('standalone');
+  expect(status.studentBoundary).toBeNull();
+  expect(status.releasedRegion).toBeNull();
+
+  await expect(page.locator('#storyboard-track .story-thumb-boundary')).toHaveCount(0);
+  await expect(page.locator('#storyboard-track .story-thumb-locked')).toHaveCount(0);
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+  });
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.role).toBe('instructor');
+  expect(status.studentBoundary).toBeNull();
+  expect(status.releasedRegion).toBeNull();
+  expect(status.boundaryIsLocal).toBe(false);
+
+  await expect(page.locator('#storyboard-track .story-thumb-boundary')).toHaveCount(0);
+  await expect(page.locator('#storyboard-track .story-thumb-locked')).toHaveCount(0);
+  await expect(page.locator('#storyboard-track .story-boundary-btn')).toHaveCount(4);
+});
+
 test('instructor storyboard boundary announcements do not duplicate on rerender', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
