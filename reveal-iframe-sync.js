@@ -76,14 +76,6 @@
         animation: none !important;
       }
 
-      .reveal .controls .navigate-left.disabled .controls-arrow,
-      .reveal .controls .navigate-right.disabled .controls-arrow,
-      .reveal .controls .navigate-left[aria-disabled="true"] .controls-arrow,
-      .reveal .controls .navigate-right[aria-disabled="true"] .controls-arrow {
-        animation: none !important;
-        transition: none !important;
-      }
-
       .reveal .controls .navigate-left.disabled.highlight,
       .reveal .controls .navigate-right.disabled.highlight,
       .reveal .controls .navigate-left[aria-disabled="true"].highlight,
