@@ -139,6 +139,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
         previewHeight: previewRect?.height ?? 0,
         previewOverflow: preview ? getComputedStyle(preview).overflow : '',
         sceneTransform: scene ? getComputedStyle(scene).transform : '',
+        sceneScaleX: scene ? new DOMMatrixReadOnly(getComputedStyle(scene).transform).a : 0,
         captionText: caption?.textContent?.trim() ?? '',
         storyboardHeight: storyboardRect?.height ?? 0,
       };
@@ -156,6 +157,8 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     expect(metrics.previewHeight).toBeLessThan(112);
     expect(metrics.previewOverflow).toBe('hidden');
     expect(metrics.sceneTransform).not.toBe('none');
+    expect(metrics.sceneScaleX).toBeGreaterThan(0.11);
+    expect(metrics.sceneScaleX).toBeLessThan(0.13);
     expect(metrics.captionText.length).toBeGreaterThan(0);
     expect(metrics.storyboardHeight).toBeGreaterThan(170);
   });

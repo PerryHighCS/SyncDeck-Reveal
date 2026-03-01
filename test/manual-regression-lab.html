@@ -657,13 +657,13 @@ body.storyboard-open .storyboard {
   min-height: 176px;
 }
 
-body.storyboard-open .reveal {
+body.storyboard-open > .reveal {
   transform: translateY(-176px);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .storyboard,
-  body.storyboard-open .reveal {
+  body.storyboard-open > .reveal {
     transition: none;
   }
 }
