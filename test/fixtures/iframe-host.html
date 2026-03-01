@@ -13,8 +13,13 @@
     const frame = document.getElementById('deck-frame');
     const params = new URLSearchParams(window.location.search);
     const frameSrc = params.get('src') || './runtime-harness.html';
+    const expectedDeckId = 'fixture-deck';
 
     window.addEventListener('message', (event) => {
+      if (event.source !== frame.contentWindow) return;
+      if (event.data?.type !== 'reveal-sync') return;
+      if (event.data?.deckId !== expectedDeckId) return;
+
       messages.push({
         origin: event.origin,
         data: event.data,
