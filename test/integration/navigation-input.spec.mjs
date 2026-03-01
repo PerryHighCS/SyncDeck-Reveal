@@ -89,6 +89,51 @@ test('student follow-instructor mode auto-captures boundary from synced state af
   expect(status.navigation.canGoDown).toBe(false);
 });
 
+test('follow mode with studentCanNavigateForward enabled does not exact-lock the top boundary slide', async ({ page }) => {
+  await configureHarness(page, {
+    revealOptions: {
+      iframeSync: {
+        studentCanNavigateForward: true,
+      },
+    },
+  });
+
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.navigation.canGoForward === false
+      && status.navigation.canGoDown === true;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoDown === true;
+  });
+});
+
 test('student follow-instructor mode exact-locks flat boundary slides before and after the first fragment', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

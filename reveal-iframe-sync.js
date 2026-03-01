@@ -966,9 +966,20 @@
     ctx.state.releaseEndH = boundary.h;
   }
 
+  function shouldEnforceExactBoundaryLock(ctx) {
+    if (ctx.state.role !== 'student') return false;
+    return ctx.state.hasExplicitBoundary || !ctx.config.studentCanNavigateForward;
+  }
+
   function syncExactBoundaryFragmentLock(ctx) {
     if (ctx.state.role !== 'student') return false;
     if (!ctx.state.studentMaxIndices) return false;
+
+    if (!shouldEnforceExactBoundaryLock(ctx)) {
+      const hadExactBoundary = !!ctx.state.exactStudentMaxIndices;
+      ctx.state.exactStudentMaxIndices = null;
+      return hadExactBoundary;
+    }
 
     const boundary = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
     const current = normalizeIndices(ctx.deck.getIndices());
@@ -990,6 +1001,12 @@
   function syncExactBoundaryFromIndices(ctx, indices) {
     if (ctx.state.role !== 'student') return false;
     if (!ctx.state.studentMaxIndices) return false;
+
+    if (!shouldEnforceExactBoundaryLock(ctx)) {
+      const hadExactBoundary = !!ctx.state.exactStudentMaxIndices;
+      ctx.state.exactStudentMaxIndices = null;
+      return hadExactBoundary;
+    }
 
     const boundary = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
     const nextExactBoundary = normalizeIndices(indices);
