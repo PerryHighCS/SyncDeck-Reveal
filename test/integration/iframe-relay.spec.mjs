@@ -91,7 +91,6 @@ test.describe('iframe host relay behavior', () => {
     await postCommand(page, 'setStudentBoundary', {
       indices: { h: 1, v: 0, f: -1 },
       releaseStartH: 0,
-      syncToBoundary: true,
     });
     await postCommand(page, 'setState', {
       state: { indexh: 1, indexv: 0, indexf: -1 },
@@ -114,6 +113,62 @@ test.describe('iframe host relay behavior', () => {
     expect(response.data.payload.indices).toEqual({ h: 1, v: 0, f: -1 });
     expect(response.data.payload.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
     expect(response.data.payload.releasedRegion).toEqual({ startH: 0, endH: 1 });
+  });
+
+  test('syncToInstructor snaps student to supplied state and restores follow-instructor mode', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+
+    await postCommand(page, 'setRole', { role: 'student' });
+    await postCommand(page, 'setStudentBoundary', {
+      indices: { h: 2, v: 0, f: -1 },
+      releaseStartH: 0,
+    });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      return status?.studentBoundary?.h === 2
+        && status?.indices?.h === 0;
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'syncToInstructor', {
+      state: { indexh: 1, indexv: 0, indexf: -1 },
+    });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      return status?.indices?.h === 1
+        && status?.indices?.v === 0
+        && status?.indices?.f === -1
+        && status?.studentBoundary?.h === 1
+        && status?.releasedRegion?.startH === 1
+        && status?.releasedRegion?.endH === 1;
+    });
+
+    const frameStatus = await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      return frame.contentWindow.RevealIframeSyncAPI.getStatus();
+    });
+    expect(frameStatus.indices).toEqual({ h: 1, v: 0, f: -1 });
+    expect(frameStatus.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
+    expect(frameStatus.releasedRegion).toEqual({ startH: 1, endH: 1 });
+
+    let messages = await hostMessages(page);
+    expect(messages.some((entry) => entry.data?.action === 'studentBoundaryChanged')).toBe(false);
+
+    await clearHostMessages(page);
+    await page.evaluate(() => window.__hostHarness.requestState());
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.payload?.reason === 'requestState'));
+
+    messages = await hostMessages(page);
+    const requestedState = findMessage(messages, 'state');
+    expect(requestedState?.data?.payload?.indices).toEqual({ h: 1, v: 0, f: -1 });
+    expect(requestedState?.data?.payload?.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
   });
 
   test('host receives instructor boundary changes from storyboard actions', async ({ page }) => {

@@ -288,7 +288,6 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     await sendCommand(page, 'setStudentBoundary', {
       indices: { h: 4, v: 0, f: 0 },
       releaseStartH: 0,
-      syncToBoundary: true,
     }, 'manual-regression-lab');
 
     await sendCommand(page, 'setState', {

@@ -33,7 +33,6 @@ test('student explicit boundary updates status, navigation, and released storybo
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.waitForFunction(() => {

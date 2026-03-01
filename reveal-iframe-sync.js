@@ -1123,6 +1123,27 @@
     });
   }
 
+  function applySyncedState(ctx, payload) {
+    if (!payload?.state) return null;
+
+    // Strip `overview` before applying — Reveal's built-in grid overview
+    // should never be activated on the receiving end. Instead, route the
+    // overview flag to the custom bottom-of-screen storyboard strip.
+    const { overview, ...safeState } = payload.state;
+    const resolvedState = resolveStudentSyncedState(ctx, safeState);
+    ctx.deck.setState({
+      ...safeState,
+      indexh: resolvedState.applied.h,
+      indexv: resolvedState.applied.v,
+      indexf: resolvedState.applied.f,
+    });
+    if (overview !== undefined) {
+      window.dispatchEvent(new CustomEvent('reveal-storyboard-set', { detail: { open: !!overview } }));
+    }
+
+    return resolvedState;
+  }
+
   function resolveStudentSyncedState(ctx, state) {
     const incoming = stateIndicesFromPayload(state);
 
@@ -1134,13 +1155,15 @@
     const preserveLocalStackPosition = current.h === incoming.h
       && topLevelSlideHasVerticalChildren(incoming.h)
       && (current.v > 0 || incoming.v > 0);
-    if (incoming.v === 0) {
-      clearSuppressedFutureFragments();
-      rememberTopSlideFragment(ctx, incoming);
-    }
     const applied = preserveLocalStackPosition
       ? { h: incoming.h, v: current.v, f: current.f }
       : incoming;
+    if (incoming.v === 0) {
+      rememberTopSlideFragment(ctx, incoming);
+    }
+    if (applied.v === 0) {
+      clearSuppressedFutureFragments();
+    }
 
     return {
       applied: normalizeStudentVisibleIndices(ctx, applied),
@@ -1246,6 +1269,19 @@
     emitLocalStatusEvent(ctx, reason || 'clearBoundary');
   }
 
+  function resetStudentFollowInstructorState(ctx) {
+    ctx.state.studentMaxIndices = null;
+    ctx.state.hasExplicitBoundary = false;
+    ctx.state.boundaryIsLocal = false;
+    ctx.state.exactStudentMaxIndices = null;
+    ctx.state.lastAllowedStudentIndices = null;
+    ctx.state.releaseStartH = null;
+    ctx.state.releaseEndH = null;
+    window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
+      detail: { indices: null },
+    }));
+  }
+
   function enforceStudentNavigationBoundary(ctx) {
     // This now acts as a safety net. The preventive control system (updateNavigationControls)
     // should block navigation before it happens, but we keep this as a fallback for any
@@ -1331,6 +1367,7 @@
     const deck = ctx.deck;
     const payload = command.payload || {};
     let shouldCaptureStudentBoundary = false;
+    let boundaryCaptureReason = 'captureStudentBoundary';
 
     if (!deck) return;
 
@@ -1350,24 +1387,16 @@
           shouldCaptureStudentBoundary = true;
           break;
         case 'setState':
-          if (payload.state) {
-            // Strip `overview` before applying — Reveal's built-in grid overview
-            // should never be activated on the receiving end. Instead, route the
-            // overview flag to the custom bottom-of-screen storyboard strip.
-            const { overview, ...safeState } = payload.state;
-            const resolvedState = resolveStudentSyncedState(ctx, safeState);
-            deck.setState({
-              ...safeState,
-              indexh: resolvedState.applied.h,
-              indexv: resolvedState.applied.v,
-              indexf: resolvedState.applied.f,
-            });
-            payload.__resolvedSyncBoundary = resolvedState.syncedBoundary;
-            if (overview !== undefined) {
-              window.dispatchEvent(new CustomEvent('reveal-storyboard-set', { detail: { open: !!overview } }));
-            }
-          }
+          payload.__resolvedSyncBoundary = applySyncedState(ctx, payload)?.syncedBoundary || null;
           shouldCaptureStudentBoundary = true;
+          break;
+        case 'syncToInstructor':
+          if (ctx.state.role === 'student') {
+            resetStudentFollowInstructorState(ctx);
+          }
+          payload.__resolvedSyncBoundary = applySyncedState(ctx, payload)?.syncedBoundary || null;
+          shouldCaptureStudentBoundary = true;
+          boundaryCaptureReason = 'syncToInstructor';
           break;
 
         // overview commands → custom storyboard strip (not Reveal's built-in grid).
@@ -1444,7 +1473,6 @@
         case 'allowStudentForwardTo': {
           const target = payload.indices || payload;
           setStudentBoundary(ctx, target, {
-            syncToBoundary: !!payload.syncToBoundary,
             reason: 'allowStudentForwardTo',
             releaseStartH: payload.releaseStartH,
           });
@@ -1453,7 +1481,6 @@
         case 'setStudentBoundary': {
           const target = payload.indices || payload;
           setStudentBoundary(ctx, target, {
-            syncToBoundary: !!payload.syncToBoundary,
             reason: 'setStudentBoundary',
             releaseStartH: payload.releaseStartH,
           });
@@ -1514,7 +1541,7 @@
       if (shouldCaptureStudentBoundary && ctx.state.role === 'student' && !ctx.state.hasExplicitBoundary) {
         captureStudentBoundary(ctx);
         updateNavigationControls(ctx);
-        emitLocalStatusEvent(ctx, 'captureStudentBoundary');
+        emitLocalStatusEvent(ctx, boundaryCaptureReason);
       }
 
       const syncedBoundaryIndices = command.name === 'setState'

@@ -583,7 +583,6 @@ test('student keeps local lower stack child when instructor moves down and back 
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -636,6 +635,86 @@ test('student keeps local lower stack child when instructor moves down and back 
   });
 });
 
+test('top-slide sync does not clear suppressed future fragments while student remains on a lower stack child', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: 0 },
+    releaseStartH: 0,
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    const extra = document.createElement('p');
+    extra.className = 'fragment';
+    extra.textContent = 'Hidden future fragment';
+    topSlide.appendChild(extra);
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  let suppressed = await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    return Array.from(topSlide.querySelectorAll('.fragment')).map((fragment) => fragment.classList.contains('syncdeck-suppressed-future'));
+  });
+  expect(suppressed).toEqual([false, true]);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  suppressed = await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    return Array.from(topSlide.querySelectorAll('.fragment')).map((fragment) => fragment.classList.contains('syncdeck-suppressed-future'));
+  });
+  expect(suppressed).toEqual([false, true]);
+
+  await page.evaluate(() => {
+    window.Reveal.up();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  suppressed = await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    return Array.from(topSlide.querySelectorAll('.fragment')).map((fragment) => fragment.classList.contains('syncdeck-suppressed-future'));
+  });
+  expect(suppressed).toEqual([false, false]);
+});
+
 test('setting a boundary ahead updates the release without pulling the student forward', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -646,7 +725,6 @@ test('setting a boundary ahead updates the release without pulling the student f
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 2, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.waitForFunction(() => {
@@ -667,7 +745,6 @@ test('explicit horizontal release ranges reveal all fragments on flat slides ins
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 3, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.evaluate(() => {
@@ -726,7 +803,6 @@ test('student can rewind off an explicit-boundary flat slide and return to the l
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 2, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.evaluate(() => {
@@ -791,7 +867,6 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.evaluate(() => {
@@ -840,7 +915,6 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: false,
   });
 
   await page.waitForFunction(() => {
@@ -872,7 +946,6 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.evaluate(() => {
@@ -895,7 +968,6 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: false,
   });
 
   await page.waitForFunction(() => {
@@ -928,7 +1000,6 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 2, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: false,
   });
 
   await page.waitForFunction(() => {
@@ -976,7 +1047,6 @@ test('explicit boundary exact-locks a flat slide to the instructor fragment posi
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 2, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1012,7 +1082,6 @@ test('explicit boundary exact-locks a flat slide to the instructor fragment posi
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 2, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1051,7 +1120,6 @@ test('same-h boundary reset leaves released stack children locally navigable', a
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1075,7 +1143,6 @@ test('same-h boundary reset leaves released stack children locally navigable', a
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: false,
   });
 
   await page.waitForFunction(() => {
@@ -1126,7 +1193,6 @@ test('student descending into a lower stack child sees all fragments on that chi
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1182,7 +1248,6 @@ test('no-back mode treats the boundary as both min and max and snaps back to the
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1242,7 +1307,6 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1335,7 +1399,6 @@ test('student keyboard handling enables only allowed directions and blocks overv
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   config = await latestDeckConfig(page);
@@ -1586,7 +1649,6 @@ test('right-arrow does not stand in for down when only stack descent is availabl
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await sendCommand(page, 'setState', {
@@ -1723,7 +1785,6 @@ test('up/down navigation stays vertical and does not consume fragments', async (
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.evaluate(() => {
@@ -1771,7 +1832,6 @@ test('up/down control buttons stay vertical and do not consume fragments', async
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
   });
 
   await page.evaluate(() => {
@@ -1945,7 +2005,6 @@ test('student touch swipe uses top-slide fragments within the boundary and block
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: false,
   });
 
   await page.evaluate(() => {
