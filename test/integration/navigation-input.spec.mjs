@@ -948,7 +948,7 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
   expect(status.navigation.canGoBack).toBe(false);
 });
 
-test('student keyboard map enables only allowed directions and blocks overview keys', async ({ page }) => {
+test('student keyboard handling enables only allowed directions and blocks overview keys', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
   await page.evaluate(() => {

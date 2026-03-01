@@ -675,50 +675,9 @@
     }
 
     // For students, enable navigation methods only for allowed directions.
-    // Use a keyboard map to selectively enable only permitted navigation keys.
-    const keyboardMap = {};
-
-    if (nav.canGoLeft) {
-      keyboardMap[37] = 'left';   // left arrow
-      keyboardMap[72] = 'left';   // h
-    } else if (nav.canGoBack && hasBackwardFragmentStep(ctx.deck)) {
-      keyboardMap[37] = 'prev';   // left arrow falls back to fragment/back progression
-      keyboardMap[72] = 'prev';   // h
-    }
-
-    if (nav.canGoBack) {
-      keyboardMap[33] = 'prev';   // page up
-    }
-
-    if (nav.canGoRight) {
-      keyboardMap[39] = 'right';  // right arrow
-      keyboardMap[76] = 'right';  // l
-    } else if (nav.canGoForward && hasForwardFragmentStep(ctx.deck)) {
-      keyboardMap[39] = 'next';   // right arrow falls back to fragment/forward progression
-      keyboardMap[76] = 'next';   // l
-    }
-
-    if (nav.canGoForward) {
-      keyboardMap[34] = 'next';   // page down
-      keyboardMap[32] = 'next';   // space
-    }
-
-    if (nav.canGoUp) {
-      keyboardMap[38] = () => ctx.deck.up?.();     // up arrow stays purely vertical
-    }
-
-    if (nav.canGoDown) {
-      keyboardMap[40] = () => ctx.deck.down?.();   // down arrow stays purely vertical
-    }
-
-    // Allow ESC but not for overview (map to 'null' to disable default ESC behavior).
-    // Students should not see the built-in grid overview as it bypasses boundaries.
-    keyboardMap[27] = 'null';     // escape (disable overview)
-    keyboardMap[79] = 'null';     // o (disable overview)
-    keyboardMap[70] = 'null';     // f (fullscreen)
-
     ctx.deck.configure({
-      // Enable keyboard only with the specific keys we've mapped.
+      // Directional keys are owned by the runtime's capture-phase interceptors,
+      // not Reveal's built-in keyboard map.
       keyboard: false,
 
       // Enable touch if any horizontal or vertical navigation is permitted.
