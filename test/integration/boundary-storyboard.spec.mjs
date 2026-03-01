@@ -31,8 +31,12 @@ test('student explicit boundary updates status, navigation, and released storybo
     window.RevealIframeSyncAPI.setRole('student');
   });
 
-  await expect(page.locator('#storyboard-track .story-thumb-wrap')).toHaveCount(1);
-  await expect(page.locator('#storyboard-track .story-thumb-locked')).toHaveCount(1);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.role === 'student'
+      && document.querySelectorAll('#storyboard-track .story-thumb-wrap').length === 1
+      && document.querySelectorAll('#storyboard-track .story-thumb-locked').length === 1;
+  });
 
   let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.role).toBe('student');
@@ -48,8 +52,20 @@ test('student explicit boundary updates status, navigation, and released storybo
     syncToBoundary: true,
   });
 
-  await expect(page.locator('#storyboard-track .story-thumb-wrap')).toHaveCount(2);
-  await expect(page.locator('#storyboard-track .story-thumb-locked')).toHaveCount(1);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    const wraps = Array.from(document.querySelectorAll('#storyboard-track .story-thumb-wrap'));
+    const locked = document.querySelectorAll('#storyboard-track .story-thumb-locked').length;
+    return status.studentBoundary?.h === 1
+      && status.indices.h === 1
+      && wraps.length === 2
+      && locked === 1
+      && wraps[0]?.classList.contains('story-thumb-released')
+      && wraps[0]?.classList.contains('story-thumb-release-start')
+      && wraps[1]?.classList.contains('story-thumb-boundary')
+      && wraps[1]?.classList.contains('story-thumb-released')
+      && wraps[1]?.classList.contains('story-thumb-release-end');
+  });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
@@ -60,13 +76,23 @@ test('student explicit boundary updates status, navigation, and released storybo
   expect(status.navigation.canGoForward).toBe(true);
   expect(status.navigation.canGoDown).toBe(true);
 
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(0)).toHaveAttribute('data-slide', '0');
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(0)).toHaveClass(/story-thumb-released/);
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(0)).toHaveClass(/story-thumb-release-start/);
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(1)).toHaveAttribute('data-slide', '1');
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(1)).toHaveClass(/story-thumb-boundary/);
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(1)).toHaveClass(/story-thumb-released/);
-  await expect(page.locator('#storyboard-track .story-thumb-wrap').nth(1)).toHaveClass(/story-thumb-release-end/);
+  const storyboardState = await page.evaluate(() => Array.from(document.querySelectorAll('#storyboard-track .story-thumb-wrap')).map((wrap) => ({
+    slide: wrap.getAttribute('data-slide'),
+    className: wrap.className,
+  })));
+  expect(storyboardState).toEqual([
+    expect.objectContaining({
+      slide: '0',
+      className: expect.stringContaining('story-thumb-released'),
+    }),
+    expect.objectContaining({
+      slide: '1',
+      className: expect.stringContaining('story-thumb-boundary'),
+    }),
+  ]);
+  expect(storyboardState[0].className).toContain('story-thumb-release-start');
+  expect(storyboardState[1].className).toContain('story-thumb-released');
+  expect(storyboardState[1].className).toContain('story-thumb-release-end');
 });
 
 test('standalone and instructor roles do not show a phantom boundary marker', async ({ page }) => {

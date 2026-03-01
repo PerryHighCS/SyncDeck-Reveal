@@ -539,37 +539,39 @@ test('student touch swipe uses fragments within the boundary and blocks horizont
 
   async function swipeLeft() {
     return page.evaluate(() => {
-      const startEvent = new TouchEvent('touchstart', {
-        bubbles: true,
-        cancelable: true,
-        touches: [new Touch({
+      function touchPoint(clientX, clientY) {
+        return {
           identifier: 1,
           target: document.body,
-          clientX: 200,
-          clientY: 100,
-        })],
+          clientX,
+          clientY,
+        };
+      }
+
+      function createTouchLikeEvent(type, { touches = [], changedTouches = [] } = {}) {
+        const event = new Event(type, {
+          bubbles: true,
+          cancelable: true,
+        });
+
+        Object.defineProperties(event, {
+          touches: { configurable: true, value: touches },
+          changedTouches: { configurable: true, value: changedTouches },
+        });
+
+        return event;
+      }
+
+      const startEvent = createTouchLikeEvent('touchstart', {
+        touches: [touchPoint(200, 100)],
       });
 
-      const moveEvent = new TouchEvent('touchmove', {
-        bubbles: true,
-        cancelable: true,
-        touches: [new Touch({
-          identifier: 1,
-          target: document.body,
-          clientX: 150,
-          clientY: 100,
-        })],
+      const moveEvent = createTouchLikeEvent('touchmove', {
+        touches: [touchPoint(150, 100)],
       });
 
-      const endEvent = new TouchEvent('touchend', {
-        bubbles: true,
-        cancelable: true,
-        changedTouches: [new Touch({
-          identifier: 1,
-          target: document.body,
-          clientX: 150,
-          clientY: 100,
-        })],
+      const endEvent = createTouchLikeEvent('touchend', {
+        changedTouches: [touchPoint(150, 100)],
       });
 
       window.dispatchEvent(startEvent);
