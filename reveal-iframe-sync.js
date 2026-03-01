@@ -916,8 +916,24 @@
 
         if (!ctx.state.applyingRemote && ctx.state.role === 'student') {
           const nav = buildNavigationStatus(ctx);
-          if (!predicate(nav)) {
+          const canUseNext = methodName === 'next'
+            ? (
+              nav.canGoForward
+              || nav.canGoDown
+              || nav.canGoRight
+              || canAdvanceRightWithinHF(ctx, nav)
+            )
+            : predicate(nav);
+          if (!canUseNext) {
             return undefined;
+          }
+          if (
+            methodName === 'next'
+            && nav.canGoRight
+            && !nav.canGoDown
+            && !canAdvanceRightWithinHF(ctx, nav)
+          ) {
+            return moveHorizontal(ctx, 'right');
           }
           if (
             methodName === 'next'
@@ -1182,7 +1198,7 @@
     if (!canGoForward && current.h > max.h) shouldReset = true;
     if (!canGoBack && current.h < max.h) shouldReset = true;
     if (!canGoBack && lastAllowed && compareIndices(current, lastAllowed) < 0) shouldReset = true;
-    if (isPastForwardBoundary(ctx, current)) shouldReset = true;
+    if (!canGoForward && isPastForwardBoundary(ctx, current)) shouldReset = true;
 
     if (!shouldReset) {
       if (compareIndices(current, normalizeIndices(ctx.deck.getIndices())) !== 0) {
@@ -1521,6 +1537,8 @@
 
       const currentControls = document.querySelector('.reveal .controls');
       if (currentControls) {
+        const supportsPointerEvents = typeof window.PointerEvent === 'function';
+
         const handleDirectionalControl = (button) => {
           debugLog(() => ['control:activate', {
             role: ctx.state.role,
@@ -1541,30 +1559,43 @@
 
         const interceptControlPress = (event) => {
           const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
-          if (!button) return;
+          if (!button) return null;
 
           event.preventDefault();
           event.stopPropagation();
           if (typeof event.stopImmediatePropagation === 'function') {
             event.stopImmediatePropagation();
           }
+          return button;
         };
 
-        const interceptControlClick = (event) => {
-          const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
+        const interceptControlActivate = (event) => {
+          const button = interceptControlPress(event);
           if (!button) return;
-          interceptControlPress(event);
           handleDirectionalControl(button);
         };
 
-        currentControls.addEventListener('pointerdown', interceptControlPress, true);
-        currentControls.addEventListener('mousedown', interceptControlPress, true);
-        currentControls.addEventListener('touchstart', interceptControlPress, true);
+        const interceptControlClick = (event) => {
+          const button = interceptControlPress(event);
+          if (!button) return;
+          if (supportsPointerEvents) return;
+          handleDirectionalControl(button);
+        };
+
+        if (supportsPointerEvents) {
+          currentControls.addEventListener('pointerdown', interceptControlActivate, true);
+        } else {
+          currentControls.addEventListener('mousedown', interceptControlActivate, true);
+          currentControls.addEventListener('touchstart', interceptControlActivate, true);
+        }
         currentControls.addEventListener('click', interceptControlClick, true);
         ctx.cleanup.push(() => {
-          currentControls.removeEventListener('pointerdown', interceptControlPress, true);
-          currentControls.removeEventListener('mousedown', interceptControlPress, true);
-          currentControls.removeEventListener('touchstart', interceptControlPress, true);
+          if (supportsPointerEvents) {
+            currentControls.removeEventListener('pointerdown', interceptControlActivate, true);
+          } else {
+            currentControls.removeEventListener('mousedown', interceptControlActivate, true);
+            currentControls.removeEventListener('touchstart', interceptControlActivate, true);
+          }
           currentControls.removeEventListener('click', interceptControlClick, true);
         });
       }

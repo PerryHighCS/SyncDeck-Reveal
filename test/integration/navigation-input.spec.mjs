@@ -134,6 +134,69 @@ test('follow mode with studentCanNavigateForward enabled does not exact-lock the
   });
 });
 
+test('next and PageDown still advance horizontally for students when canGoRight is true but canGoForward is false', async ({ page }) => {
+  await configureHarness(page, {
+    revealOptions: {
+      iframeSync: {
+        studentCanNavigateForward: true,
+      },
+    },
+  });
+
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 1, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.navigation.canGoRight === true
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 1, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.navigation.canGoRight === true
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.keyboard.press('PageDown');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+});
+
 test('student follow-instructor mode exact-locks flat boundary slides before and after the first fragment', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
