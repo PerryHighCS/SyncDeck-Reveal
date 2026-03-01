@@ -269,6 +269,7 @@
 
   function canRewindLeftWithinHF(ctx, nav) {
     if (!hasBackwardFragmentStep(ctx.deck)) return false;
+    if (!nav.canGoBack) return false;
     return nav.current.v === 0;
   }
 

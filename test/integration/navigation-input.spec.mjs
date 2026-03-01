@@ -902,6 +902,18 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
   expect(status.navigation.canGoBack).toBe(false);
+  expect(status.navigation.canGoLeft).toBe(false);
+
+  await page.keyboard.press('ArrowLeft');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoLeft === false
+      && status.navigation.canGoBack === false;
+  });
 
   await page.evaluate(() => {
     window.Reveal.next();
