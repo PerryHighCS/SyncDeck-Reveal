@@ -22,6 +22,7 @@
 (function () {
   const IFRAME_SYNC_VERSION = '1.1.0';
   const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
+  const DEBUG_LOG_ENABLED = !!window.__SYNCDECK_DEBUG;
 
   const DEFAULTS = {
     role: 'student',
@@ -64,7 +65,12 @@
   }
 
   function debugLog(...args) {
-    void args;
+    if (!DEBUG_LOG_ENABLED) return;
+    const nextArgs = args.length === 1 && typeof args[0] === 'function'
+      ? args[0]()
+      : args;
+    if (!Array.isArray(nextArgs)) return;
+    console.debug('[RevealIframeSync]', ...nextArgs);
   }
 
   function describeElement(element) {
@@ -309,24 +315,24 @@
     const routes = getDirectionalRoutes(ctx.deck);
     const canMoveVertically = direction === 'up' ? routes.hasUp : routes.hasDown;
 
-    debugLog('verticalMethod:start', {
+    debugLog(() => ['verticalMethod:start', {
       methodName: direction,
       role: ctx.state.role,
       current,
       routes,
       canMoveVertically,
       activeElement: describeElement(document.activeElement),
-    });
+    }]);
     if (ctx.state.role === 'student') {
       const nav = buildNavigationStatus(ctx);
       if (!(direction === 'up' ? nav.canGoUp : nav.canGoDown)) {
-        debugLog('verticalMethod:block', { methodName: direction, nav });
+        debugLog(() => ['verticalMethod:block', { methodName: direction, nav }]);
         return undefined;
       }
     }
 
     if (!canMoveVertically) {
-      debugLog('verticalMethod:noRoute', { methodName: direction, current, routes });
+      debugLog(() => ['verticalMethod:noRoute', { methodName: direction, current, routes }]);
       return undefined;
     }
 
@@ -338,17 +344,19 @@
     const targetV = direction === 'up' ? current.v - 1 : current.v + 1;
     const targetF = targetV === 0
       ? resolveTopSlideReturnFragment(ctx, current.h)
-      : revealAllFragmentsIndexForSlide({ h: current.h, v: targetV, f: -1 });
+      : (ctx.state.role === 'student'
+        ? revealAllFragmentsIndexForSlide({ h: current.h, v: targetV, f: -1 })
+        : -1);
 
     if (targetV === 0) {
       clearSuppressedFutureFragments();
     }
 
-    debugLog('verticalMethod:slide', {
+    debugLog(() => ['verticalMethod:slide', {
       methodName: direction,
       from: current,
       to: { h: current.h, v: targetV, f: targetF },
-    });
+    }]);
     return ctx.deck.slide?.(current.h, targetV, targetF);
   }
 
@@ -360,7 +368,7 @@
       ? hasBackwardFragmentStep(ctx.deck)
       : hasForwardFragmentStep(ctx.deck);
 
-    debugLog('horizontalMethod:start', {
+    debugLog(() => ['horizontalMethod:start', {
       methodName: direction,
       role: ctx.state.role,
       current,
@@ -368,58 +376,58 @@
       hasHorizontalRoute,
       hasFragmentStep,
       activeElement: describeElement(document.activeElement),
-    });
+    }]);
 
     if (ctx.state.role === 'student') {
       const nav = buildNavigationStatus(ctx);
       if (direction === 'left') {
         if (canRewindLeftWithinHF(ctx, nav)) {
           const target = { h: current.h, v: current.v, f: current.f - 1 };
-          debugLog('horizontalMethod:studentPrevFragment', { from: current, to: target, nav });
+          debugLog(() => ['horizontalMethod:studentPrevFragment', { from: current, to: target, nav }]);
           return ctx.deck.slide?.(target.h, target.v, target.f);
         }
         if (nav.canGoLeft && hasHorizontalRoute) {
           const target = { h: current.h - 1, v: 0, f: -1 };
-          debugLog('horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav });
+          debugLog(() => ['horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav }]);
           return ctx.deck.slide?.(target.h, target.v, target.f);
         }
-        debugLog('horizontalMethod:studentBlocked', { methodName: direction, nav, current });
+        debugLog(() => ['horizontalMethod:studentBlocked', { methodName: direction, nav, current }]);
         return undefined;
       }
 
       if (canAdvanceRightWithinHF(ctx, nav)) {
         const target = { h: current.h, v: current.v, f: current.f + 1 };
-        debugLog('horizontalMethod:studentNextFragment', { from: current, to: target, nav });
+        debugLog(() => ['horizontalMethod:studentNextFragment', { from: current, to: target, nav }]);
         return ctx.deck.slide?.(target.h, target.v, target.f);
       }
       if (nav.canGoRight && hasHorizontalRoute) {
         const target = { h: current.h + 1, v: 0, f: -1 };
-        debugLog('horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav });
+        debugLog(() => ['horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav }]);
         return ctx.deck.slide?.(target.h, target.v, target.f);
       }
-      debugLog('horizontalMethod:studentBlocked', { methodName: direction, nav, current });
+      debugLog(() => ['horizontalMethod:studentBlocked', { methodName: direction, nav, current }]);
       return undefined;
     }
 
     if (direction === 'left' && hasFragmentStep) {
       const target = { h: current.h, v: current.v, f: current.f - 1 };
-      debugLog('horizontalMethod:prevFragment', { from: current, to: target });
+      debugLog(() => ['horizontalMethod:prevFragment', { from: current, to: target }]);
       return ctx.deck.slide?.(target.h, target.v, target.f);
     }
 
     if (direction === 'right' && hasFragmentStep) {
       const target = { h: current.h, v: current.v, f: current.f + 1 };
-      debugLog('horizontalMethod:nextFragment', { from: current, to: target });
+      debugLog(() => ['horizontalMethod:nextFragment', { from: current, to: target }]);
       return ctx.deck.slide?.(target.h, target.v, target.f);
     }
 
     if (hasHorizontalRoute) {
       const target = { h: direction === 'left' ? current.h - 1 : current.h + 1, v: 0, f: -1 };
-      debugLog('horizontalMethod:slideHorizontal', { from: current, to: target });
+      debugLog(() => ['horizontalMethod:slideHorizontal', { from: current, to: target }]);
       return ctx.deck.slide?.(target.h, target.v, target.f);
     }
 
-    debugLog('horizontalMethod:blocked', { methodName: direction, current, routes });
+    debugLog(() => ['horizontalMethod:blocked', { methodName: direction, current, routes }]);
     return undefined;
   }
 
@@ -600,7 +608,7 @@
 
     const nav = buildNavigationStatus(ctx);
     const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
-    debugLog('updateNavigationControls', {
+    debugLog(() => ['updateNavigationControls', {
       role: ctx.state.role,
       current: nav.current,
       canGoLeft: nav.canGoLeft,
@@ -610,7 +618,7 @@
       canGoBack: nav.canGoBack,
       canGoForward: nav.canGoForward,
       isUnrestricted,
-    });
+    }]);
 
     const applyArrowLocks = () => {
       const controls = document.querySelector('.reveal .controls');
@@ -883,7 +891,7 @@
     }
   }
 
-  function wrapStudentNavigationMethods(ctx) {
+  function wrapNavigationMethods(ctx) {
     const guardedMethods = [
       ['prev', (nav) => nav.canGoBack],
       ['next', (nav) => nav.canGoForward || nav.canGoDown],
@@ -897,7 +905,7 @@
       const original = ctx.deck?.[methodName];
       if (typeof original !== 'function') return;
 
-      ctx.deck[methodName] = function wrappedStudentNavigationMethod(...args) {
+      ctx.deck[methodName] = function wrappedNavigationMethod(...args) {
         if (!ctx.state.applyingRemote && (methodName === 'up' || methodName === 'down')) {
           return moveVertical(ctx, methodName);
         }
@@ -1512,68 +1520,78 @@
       });
 
       const currentControls = document.querySelector('.reveal .controls');
-      if (!currentControls) return;
+      if (currentControls) {
+        const handleDirectionalControl = (button) => {
+          debugLog(() => ['control:activate', {
+            role: ctx.state.role,
+            button: button.className,
+            current: normalizeIndices(ctx.deck.getIndices()),
+            activeElement: describeElement(document.activeElement),
+          }]);
+          if (button.matches('.navigate-left')) {
+            ctx.deck.left?.();
+          } else if (button.matches('.navigate-right')) {
+            ctx.deck.right?.();
+          } else if (button.matches('.navigate-up')) {
+            ctx.deck.up?.();
+          } else if (button.matches('.navigate-down')) {
+            ctx.deck.down?.();
+          }
+        };
 
-      const handleDirectionalControl = (button) => {
-        debugLog('control:activate', {
-          role: ctx.state.role,
-          button: button.className,
-          current: normalizeIndices(ctx.deck.getIndices()),
-          activeElement: describeElement(document.activeElement),
+        const interceptControlPress = (event) => {
+          const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
+          if (!button) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof event.stopImmediatePropagation === 'function') {
+            event.stopImmediatePropagation();
+          }
+        };
+
+        const interceptControlClick = (event) => {
+          const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
+          if (!button) return;
+          interceptControlPress(event);
+          handleDirectionalControl(button);
+        };
+
+        currentControls.addEventListener('pointerdown', interceptControlPress, true);
+        currentControls.addEventListener('mousedown', interceptControlPress, true);
+        currentControls.addEventListener('touchstart', interceptControlPress, true);
+        currentControls.addEventListener('click', interceptControlClick, true);
+        ctx.cleanup.push(() => {
+          currentControls.removeEventListener('pointerdown', interceptControlPress, true);
+          currentControls.removeEventListener('mousedown', interceptControlPress, true);
+          currentControls.removeEventListener('touchstart', interceptControlPress, true);
+          currentControls.removeEventListener('click', interceptControlClick, true);
         });
-        if (button.matches('.navigate-left')) {
-          ctx.deck.left?.();
-        } else if (button.matches('.navigate-right')) {
-          ctx.deck.right?.();
-        } else if (button.matches('.navigate-up')) {
-          ctx.deck.up?.();
-        } else if (button.matches('.navigate-down')) {
-          ctx.deck.down?.();
-        }
-      };
+      }
+    }
 
-      const interceptControlPress = (event) => {
-        const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
-        if (!button) return;
+    const interceptDirectionalKeyboard = (event) => {
+      debugLog(() => ['raw-keydown', {
+        key: event.key,
+        defaultPrevented: event.defaultPrevented,
+        target: describeElement(event.target),
+        activeElement: describeElement(document.activeElement),
+      }]);
+      if (event.defaultPrevented) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
 
+      const isVerticalKey = event.key === 'ArrowUp' || event.key === 'ArrowDown';
+      const isHorizontalKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+      if (!isVerticalKey && !isHorizontalKey) return;
+
+      if (ctx.state.role === 'student' && ctx.state.pauseLockedByHost) {
         event.preventDefault();
         event.stopPropagation();
         if (typeof event.stopImmediatePropagation === 'function') {
           event.stopImmediatePropagation();
         }
-      };
-
-      const interceptControlClick = (event) => {
-        const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
-        if (!button) return;
-        interceptControlPress(event);
-        handleDirectionalControl(button);
-      };
-
-      currentControls.addEventListener('pointerdown', interceptControlPress, true);
-      currentControls.addEventListener('mousedown', interceptControlPress, true);
-      currentControls.addEventListener('touchstart', interceptControlPress, true);
-      currentControls.addEventListener('click', interceptControlClick, true);
-      ctx.cleanup.push(() => {
-        currentControls.removeEventListener('pointerdown', interceptControlPress, true);
-        currentControls.removeEventListener('mousedown', interceptControlPress, true);
-        currentControls.removeEventListener('touchstart', interceptControlPress, true);
-        currentControls.removeEventListener('click', interceptControlClick, true);
-      });
-    }
-
-    const interceptDirectionalKeyboard = (event) => {
-      debugLog('raw-keydown', {
-        key: event.key,
-        defaultPrevented: event.defaultPrevented,
-        target: describeElement(event.target),
-        activeElement: describeElement(document.activeElement),
-      });
-        if (event.defaultPrevented) return;
-        if (event.ctrlKey || event.metaKey || event.altKey) return;
-        const isVerticalKey = event.key === 'ArrowUp' || event.key === 'ArrowDown';
-        const isHorizontalKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
-      if (!isVerticalKey && !isHorizontalKey) return;
+        return;
+      }
 
       const target = event.target;
       if (
@@ -1586,19 +1604,19 @@
 
       event.preventDefault();
       event.stopPropagation();
-        if (typeof event.stopImmediatePropagation === 'function') {
-          event.stopImmediatePropagation();
-        }
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
 
-        debugLog('keyboard:intercept', {
-          role: ctx.state.role,
-          key: event.key,
-          current: normalizeIndices(ctx.deck.getIndices()),
-          activeElement: describeElement(document.activeElement),
-        });
+      debugLog(() => ['keyboard:intercept', {
+        role: ctx.state.role,
+        key: event.key,
+        current: normalizeIndices(ctx.deck.getIndices()),
+        activeElement: describeElement(document.activeElement),
+      }]);
 
-        if (event.key === 'ArrowUp') {
-          ctx.deck.up?.();
+      if (event.key === 'ArrowUp') {
+        ctx.deck.up?.();
       } else if (event.key === 'ArrowDown') {
         ctx.deck.down?.();
       } else if (event.key === 'ArrowLeft') {
@@ -1609,10 +1627,8 @@
     };
 
     window.addEventListener('keydown', interceptDirectionalKeyboard, true);
-    document.addEventListener('keydown', interceptDirectionalKeyboard, true);
     ctx.cleanup.push(() => {
       window.removeEventListener('keydown', interceptDirectionalKeyboard, true);
-      document.removeEventListener('keydown', interceptDirectionalKeyboard, true);
     });
     deck.on('paused', emitState);
     deck.on('resumed', emitState);
@@ -1766,15 +1782,15 @@
       },
     };
 
-    debugLog('init', {
+    debugLog(() => ['init', {
       role: ctx.state.role,
       deckId: config.deckId || null,
       hostOrigin: config.hostOrigin,
-    });
+    }]);
 
     wireDeckEvents(ctx);
     wireWindowMessageListener(ctx);
-    wrapStudentNavigationMethods(ctx);
+    wrapNavigationMethods(ctx);
     applyPauseLockUi(ctx);
 
     // Initialize navigation controls based on starting role and capabilities.
