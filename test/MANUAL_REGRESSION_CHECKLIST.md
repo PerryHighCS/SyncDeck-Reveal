@@ -44,14 +44,18 @@ Network note:
    student cannot reveal fragments locally.
 4. Reveal a fragment from the instructor side and verify the student remains
    locked to that exact fragment position rather than running ahead locally.
-5. Verify horizontal advance past the boundary is blocked.
-6. Verify the student does not flash onto the next horizontal slide before
+5. Rewind the student locally and verify they can move forward again only up to
+   the instructor's currently revealed fragment.
+6. Verify horizontal advance past the boundary is blocked.
+7. Verify the student does not flash onto the next horizontal slide before
    snapping back.
 
 Expected:
 
 - On a flat slide at the boundary `h`, the student remains locked to the
   instructor's current fragment position.
+- If the student rewinds locally on that flat slide, they may move forward
+  again only up to the instructor's current fragment.
 - The student cannot move to the next horizontal slide.
 - The storyboard continues to show the correct boundary/released range.
 
@@ -65,6 +69,8 @@ Expected:
 Expected:
 
 - Vertical navigation inside the released stack remains available.
+- Once the stack's `h` is released, deeper child slides are locally navigable
+  without the flat-slide fragment lock behavior used on the top slide.
 - Horizontal escape past the boundary remains blocked.
 
 ### Pullback from later fragment to earlier fragment on the same slide

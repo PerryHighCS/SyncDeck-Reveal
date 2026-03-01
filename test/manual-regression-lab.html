@@ -711,7 +711,7 @@ body.storyboard-open > .reveal {
           <div class="status-card">
             <span class="label">Stack</span>
             <span class="value">Two grouped stack regions</span>
-            <span class="note">Use the core 3-slide stack plus the later 2-slide stack for release and grouping checks.</span>
+            <span class="note">At a released <code>h</code>, stack child slides are free locally even when the top slide uses fragment locking.</span>
           </div>
           <div class="status-card">
             <span class="label">Host rule</span>
@@ -783,6 +783,7 @@ body.storyboard-open > .reveal {
               <li>Place the instructor on this slide before any fragment is revealed.</li>
               <li>Try advancing locally on the student view before the instructor reveals Fragment A.</li>
               <li>Reveal Fragment A from the instructor side, then try advancing locally again from the student view.</li>
+              <li>After Fragment B is revealed, move the student back one step locally and confirm they can return to Fragment B but not continue past it.</li>
               <li>After the final instructor-released fragment, try advancing one more time past the horizontal boundary.</li>
             </ol>
           </div>
@@ -791,20 +792,21 @@ body.storyboard-open > .reveal {
             <ul class="checklist expected-list">
               <li>Before the instructor reveals Fragment A, the student stays locked at the start of this slide.</li>
               <li>After the instructor reveals a fragment, the student is still locked to that current instructor fragment position.</li>
+              <li>If the student rewinds locally, they may move forward again only up to the instructor's current revealed fragment.</li>
               <li>The student cannot move to the next horizontal slide once the fragments are exhausted.</li>
               <li>No flash onto the next slide should be visible before snap-back.</li>
             </ul>
             <div class="sample-lab">
               <div class="sample-frame">
                 <h3>Fragment Rail</h3>
-                <p>Use the built-in fragments on this slide as the test material for same-slide forward movement.</p>
+                <p>Use the built-in fragments on this flat boundary slide as the test material for <code>h.f</code> locking on the top slide.</p>
                 <div class="fragment-rail">
                   <span class="fragment-pill fragment">Fragment A: released</span>
                   <span class="fragment-pill fragment">Fragment B: still same <code>h</code></span>
                   <span class="fragment-pill fragment">Fragment C: boundary should still hold</span>
                 </div>
               </div>
-              <div class="callout">If the student can reveal additional local fragments or move to the next horizontal slide without a new instructor release, treat that as a failure.</div>
+              <div class="callout">If the student can reveal additional local fragments beyond the instructor position or move to the next horizontal slide without a new instructor release, treat that as a failure. Rewinding and returning up to the current instructor fragment is allowed.</div>
             </div>
           </div>
         </div>
@@ -828,7 +830,7 @@ body.storyboard-open > .reveal {
             <div class="panel">
               <h3>Expected</h3>
               <ul class="checklist expected-list">
-                <li>Vertical movement within the released stack works.</li>
+                <li>Vertical movement within the released stack works without fragment-style locking on deeper child slides.</li>
                 <li>Horizontal movement to the next topic still does not work without a new release.</li>
               </ul>
               <div class="stack-map">
@@ -869,11 +871,11 @@ body.storyboard-open > .reveal {
             <div class="panel">
               <h3>Expected</h3>
               <ul class="checklist expected-list">
-                <li>The student remains inside the released stack.</li>
+                <li>The student remains inside the released stack and may move freely between child slides at this <code>h</code>.</li>
                 <li>Horizontal escape is blocked.</li>
                 <li>The storyboard highlights the released horizontal region, not each child as a separate release.</li>
               </ul>
-              <div class="callout">The important check here is that stack browsing stays local while the horizontal boundary still holds.</div>
+              <div class="callout">The important check here is that stack browsing stays local and unrestricted inside the released <code>h</code>, while the horizontal boundary still holds.</div>
             </div>
           </div>
         </div>
@@ -1040,6 +1042,7 @@ body.storyboard-open > .reveal {
               <ul class="checklist expected-list">
                 <li>The storyboard shows a second stack badge for this topic.</li>
                 <li>The grouped entry stays anchored to one horizontal position while the active child indicator moves within the stack.</li>
+                <li>Once this stack's <code>h</code> is released, the child slides remain locally navigable without top-slide fragment-style locking.</li>
                 <li>Releasing this stack does not flatten it into two separate horizontal thumbnails.</li>
               </ul>
               <div class="stack-map">

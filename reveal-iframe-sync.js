@@ -162,11 +162,39 @@
     return current.f > -1;
   }
 
-  function topLevelSlideHasVerticalChildren(deck, hIndex) {
-    const topLevelSlides = Array.from(document.querySelectorAll('.reveal .slides > section'));
-    const targetSlide = topLevelSlides[Math.max(0, Math.min(topLevelSlides.length - 1, Number(hIndex) || 0))];
-    if (!targetSlide) return false;
-    return Array.from(targetSlide.children).some((node) => node.tagName === 'SECTION');
+  function exactTopSlideBoundary(ctx) {
+    const exactBoundary = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
+    if (!exactBoundary) return null;
+    return exactBoundary.v === 0 ? exactBoundary : null;
+  }
+
+  function isPastForwardBoundary(ctx, indices) {
+    const current = normalizeIndices(indices);
+    const boundary = getStudentBoundary(ctx);
+    if (!boundary) return false;
+    if (current.h > boundary.h) return true;
+    if (current.h < boundary.h) return false;
+    if (current.v > 0) return false;
+
+    const exactBoundary = exactTopSlideBoundary(ctx);
+    if (exactBoundary && current.v === 0 && current.f > exactBoundary.f) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function isPastRequestedBoundary(indices, requestedBoundary) {
+    const current = normalizeIndices(indices);
+    const requested = normalizeIndices(requestedBoundary);
+
+    if (current.h > requested.h) return true;
+    if (current.h < requested.h) return false;
+    if (current.v > 0) return false;
+
+    return requested.v === 0 && current.v === 0 && current.f > requested.f;
   }
 
   function buildReleasedRegion(ctx) {
@@ -193,9 +221,7 @@
     const current = normalizeIndices(ctx.deck.getIndices());
     const roleCaps = getRoleCapabilities(ctx);
     const studentBoundary = getStudentBoundary(ctx);
-    const exactStudentBoundary = ctx.state.exactStudentMaxIndices
-      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
-      : null;
+    const exactStudentBoundary = exactTopSlideBoundary(ctx);
     const routes = getDirectionalRoutes(ctx.deck);
 
     let minIndices = null;
@@ -214,8 +240,27 @@
 
     const inFollowInstructorMode = !ctx.state.hasExplicitBoundary;
     const allowBackward = roleCaps.canNavigateBack;
+    const canAdvanceToExactBoundary = !!(
+      exactStudentBoundary
+      && current.h === exactStudentBoundary.h
+      && current.v === 0
+      && current.f < exactStudentBoundary.f
+    );
+    const canMoveForwardWithinReleasedRegion = !!(
+      studentBoundary
+      && (
+        current.h < studentBoundary.h
+        || (current.h === studentBoundary.h && current.v > 0)
+        || (current.h === studentBoundary.h && current.v === 0 && routes.hasDown)
+      )
+    );
     const allowForward = ctx.state.role === 'student'
-      ? (ctx.state.hasExplicitBoundary || roleCaps.canNavigateForward)
+      ? (
+        ctx.state.hasExplicitBoundary
+        || roleCaps.canNavigateForward
+        || canAdvanceToExactBoundary
+        || canMoveForwardWithinReleasedRegion
+      )
       : roleCaps.canNavigateForward;
     const hasBackwardFragment = hasBackwardFragmentStep(ctx.deck);
     const hasForwardFragment = hasForwardFragmentStep(ctx.deck);
@@ -251,22 +296,32 @@
           canGoRight = false;
           canGoDown = false;
         } else if (current.h === boundaryH) {
-          canGoForward = canGoForward && (routes.hasDown || hasForwardFragment);
           canGoRight = false;
           canGoDown = canGoDown && routes.hasDown;
+
+          if (current.v > 0) {
+            canGoForward = canGoForward && (routes.hasDown || hasForwardFragment);
+          } else {
+            const canAdvanceTopFragments = hasForwardFragment
+              && (!exactStudentBoundary || current.f < exactStudentBoundary.f);
+            canGoForward = canGoForward && (routes.hasDown || canAdvanceTopFragments);
+          }
         }
       }
 
-      if (inFollowInstructorMode && maxIndices && current.h >= boundaryH) {
-        canGoForward = false;
+      if (inFollowInstructorMode && maxIndices && current.h >= boundaryH && !exactStudentBoundary) {
         canGoRight = false;
-        canGoDown = false;
-      }
-
-      if (exactStudentBoundary && current.h === exactStudentBoundary.h) {
-        if (compareIndices(current, exactStudentBoundary) >= 0) {
+        if (current.h > boundaryH) {
           canGoForward = false;
           canGoDown = false;
+        } else if (current.h === boundaryH && current.v === 0) {
+          canGoForward = canGoForward && routes.hasDown;
+        }
+      }
+
+      if (exactStudentBoundary && current.h === exactStudentBoundary.h && current.v === 0) {
+        if (current.f >= exactStudentBoundary.f) {
+          canGoForward = canGoForward && routes.hasDown;
         }
       }
     }
@@ -544,6 +599,53 @@
     }
   }
 
+  function wrapStudentNavigationMethods(ctx) {
+    const guardedMethods = [
+      ['prev', (nav) => nav.canGoBack],
+      ['next', (nav) => nav.canGoForward],
+      ['left', (nav) => nav.canGoLeft],
+      ['right', (nav) => nav.canGoRight],
+      ['up', (nav) => nav.canGoUp],
+      ['down', (nav) => nav.canGoDown],
+    ];
+
+    guardedMethods.forEach(([methodName, predicate]) => {
+      const original = ctx.deck?.[methodName];
+      if (typeof original !== 'function') return;
+
+      ctx.deck[methodName] = function wrappedStudentNavigationMethod(...args) {
+        if (!ctx.state.applyingRemote && ctx.state.role === 'student') {
+          const nav = buildNavigationStatus(ctx);
+          if (!predicate(nav)) {
+            return undefined;
+          }
+          if (
+            methodName === 'next'
+            && nav.canGoDown
+            && nav.current.v === 0
+          ) {
+            const exactBoundary = exactTopSlideBoundary(ctx);
+            if (
+              exactBoundary
+              && nav.current.h === exactBoundary.h
+              && nav.current.f >= exactBoundary.f
+            ) {
+              if (typeof ctx.deck.down === 'function') {
+                return ctx.deck.down();
+              }
+              return ctx.deck.slide?.(nav.current.h, nav.current.v + 1, -1);
+            }
+          }
+        }
+        return original.apply(this, args);
+      };
+
+      ctx.cleanup.push(() => {
+        ctx.deck[methodName] = original;
+      });
+    });
+  }
+
   function captureStudentBoundary(ctx) {
     const current = normalizeIndices(ctx.deck.getIndices());
     const boundary = normalizeBoundaryIndices(current);
@@ -553,12 +655,33 @@
     // suppress same-h down/fragment advance, but keeping the precise synced
     // indices here lets enforceStudentNavigationBoundary snap back if touch or
     // direct API calls move the student deeper within the current stack.
-    ctx.state.exactStudentMaxIndices = ctx.config.studentCanNavigateForward
-      ? null
-      : current;
+    ctx.state.exactStudentMaxIndices = (!ctx.config.studentCanNavigateForward && current.v === 0)
+      ? current
+      : null;
     ctx.state.lastAllowedStudentIndices = current;
     ctx.state.releaseStartH = boundary.h;
     ctx.state.releaseEndH = boundary.h;
+  }
+
+  function syncExactBoundaryFragmentLock(ctx) {
+    if (ctx.state.role !== 'student') return false;
+    if (!ctx.state.studentMaxIndices) return false;
+
+    const boundary = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
+    const current = normalizeIndices(ctx.deck.getIndices());
+    if (current.h !== boundary.h || current.v !== 0) return false;
+
+    const nextExactBoundary = current;
+    const previousExactBoundary = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
+
+    if (previousExactBoundary && compareIndices(previousExactBoundary, nextExactBoundary) === 0) {
+      return false;
+    }
+
+    ctx.state.exactStudentMaxIndices = nextExactBoundary;
+    return true;
   }
 
   /** Default boundary for a student before the instructor has progressed. */
@@ -572,7 +695,6 @@
     const requestedBoundary = normalizeIndices(indices);
     const nextBoundary = normalizeBoundaryIndices(requestedBoundary);
     const current = normalizeIndices(ctx.deck.getIndices());
-    const boundaryHasVerticalChildren = topLevelSlideHasVerticalChildren(ctx.deck, nextBoundary.h);
     ctx.state.studentMaxIndices = nextBoundary;
     ctx.state.hasExplicitBoundary = true;
     const releaseStartH = Number.isFinite(Number(options.releaseStartH))
@@ -592,14 +714,16 @@
     // root position { h, v: 0, f: -1 } when the instructor is at the top of a
     // stack / fragment sequence). Normal boundary storage and steady-state
     // navigation enforcement remain horizontal-only via nextBoundary.
-    const isPastRequestedBoundary = compareIndices(current, requestedBoundary) > 0;
-    const shouldHoldFlatBoundaryExactly = !options.localBoundary
+    const isPastBoundary = isPastRequestedBoundary(current, requestedBoundary);
+    const shouldHoldTopSlideExactly = !options.localBoundary
       && ctx.state.role === 'student'
-      && !boundaryHasVerticalChildren;
+      && requestedBoundary.v === 0;
     const shouldExactLock = !options.localBoundary
       && ctx.state.role === 'student'
-      && (isPastRequestedBoundary || shouldHoldFlatBoundaryExactly);
-    ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
+      && (isPastBoundary || shouldHoldTopSlideExactly);
+    ctx.state.exactStudentMaxIndices = shouldExactLock && requestedBoundary.v === 0
+      ? requestedBoundary
+      : null;
     const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
     let lastAllowedTarget = current;
 
@@ -615,7 +739,7 @@
         lastAllowedTarget = snapTarget;
       } else {
         // Rubber band: if student is already past the new boundary, snap back.
-        if (isPastRequestedBoundary) {
+        if (isPastBoundary) {
           ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
           lastAllowedTarget = snapTarget;
         }
@@ -674,9 +798,7 @@
     const lastAllowed = ctx.state.lastAllowedStudentIndices
       ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
       : null;
-    const exactMax = ctx.state.exactStudentMaxIndices
-      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
-      : null;
+    const exactMax = exactTopSlideBoundary(ctx);
 
     const canGoBack = !!ctx.config.studentCanNavigateBack;
     // An explicit boundary (allowStudentForwardTo / setStudentBoundary) always
@@ -690,7 +812,7 @@
     if (!canGoForward && current.h > max.h) shouldReset = true;
     if (!canGoBack && current.h < max.h) shouldReset = true;
     if (!canGoBack && lastAllowed && compareIndices(current, lastAllowed) < 0) shouldReset = true;
-    if (exactMax && compareIndices(current, exactMax) > 0) shouldReset = true;
+    if (isPastForwardBoundary(ctx, current)) shouldReset = true;
 
     if (!shouldReset) {
       ctx.state.lastAllowedStudentIndices = current;
@@ -914,6 +1036,11 @@
         captureStudentBoundary(ctx);
         updateNavigationControls(ctx);
         emitLocalStatusEvent(ctx, 'captureStudentBoundary');
+      }
+
+      if (ctx.state.role === 'student' && ctx.state.studentMaxIndices && syncExactBoundaryFragmentLock(ctx)) {
+        updateNavigationControls(ctx);
+        emitLocalStatusEvent(ctx, 'syncExactBoundaryFragmentLock');
       }
 
       // If a synced state explicitly carries paused=true/false, mirror lock state
@@ -1140,6 +1267,7 @@
 
     wireDeckEvents(ctx);
     wireWindowMessageListener(ctx);
+    wrapStudentNavigationMethods(ctx);
     applyPauseLockUi(ctx);
 
     // Initialize navigation controls based on starting role and capabilities.

@@ -155,6 +155,189 @@ test('student follow-instructor mode exact-locks flat boundary slides before and
       && status.indices.v === 0
       && status.indices.f === 0;
   });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.prev();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoForward === true;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 2 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 2
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 2;
+  });
+});
+
+test('student can rewind off a flat boundary slide and return to the instructor revealed fragment', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.prev();
+    window.Reveal.prev();
+    window.Reveal.prev();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.navigation.canGoForward === true;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+    window.Reveal.next();
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+});
+
+test('student can rewind off an explicit-boundary flat slide and return to the latest instructor fragment', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 2, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.prev();
+    window.Reveal.prev();
+    window.Reveal.prev();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.navigation.canGoForward === true;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+    window.Reveal.next();
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
 });
 
 test('student direct API bypass snaps back to explicit boundary and exact pullback lock', async ({ page }) => {
@@ -205,7 +388,7 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+    return status.indices.h === 1 && status.indices.v === 1 && status.indices.f === -1;
   });
 
   await page.evaluate(() => {
@@ -214,15 +397,15 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+    return status.indices.h === 1 && status.indices.v === 1 && status.indices.f === -1;
   });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
   expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
 });
 
-test('same-h fragment pullback exact-locks to the requested fragment and clears on boundary replacement', async ({ page }) => {
+test('same-h top-slide fragment pullback exact-locks fragments and clears on boundary replacement', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
   await page.evaluate(() => {
@@ -230,18 +413,9 @@ test('same-h fragment pullback exact-locks to the requested fragment and clears 
   });
 
   await sendCommand(page, 'setStudentBoundary', {
-    indices: { h: 1, v: 0, f: -1 },
+    indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
-  });
-
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
-  });
-
-  await page.evaluate(() => {
-    window.Reveal.next();
   });
 
   await page.waitForFunction(() => {
@@ -263,7 +437,7 @@ test('same-h fragment pullback exact-locks to the requested fragment and clears 
   let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
-  expect(status.navigation.canGoForward).toBe(false);
+  expect(status.navigation.canGoForward).toBe(true);
 
   await page.evaluate(() => {
     window.Reveal.next();
@@ -272,13 +446,13 @@ test('same-h fragment pullback exact-locks to the requested fragment and clears 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
-      && status.indices.v === 0
+      && status.indices.v === 1
       && status.indices.f === -1
       && status.navigation.canGoForward === false;
   });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
   expect(status.navigation.canGoForward).toBe(false);
 
   await sendCommand(page, 'setStudentBoundary', {
@@ -291,6 +465,17 @@ test('same-h fragment pullback exact-locks to the requested fragment and clears 
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.studentBoundary?.h === 2
       && status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
       && status.indices.v === 0
       && status.indices.f === -1;
   });
@@ -364,9 +549,21 @@ test('explicit boundary exact-locks a flat slide to the instructor fragment posi
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.navigation.current).toEqual({ h: 2, v: 0, f: 0 });
   expect(status.navigation.canGoForward).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoForward === false;
+  });
 });
 
-test('same-h vertical pullback exact-locks to the requested stack child', async ({ page }) => {
+test('same-h boundary reset leaves released stack children locally navigable', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
   await page.evaluate(() => {
@@ -385,8 +582,7 @@ test('same-h vertical pullback exact-locks to the requested stack child', async 
   });
 
   await page.evaluate(() => {
-    window.Reveal.next();
-    window.Reveal.next();
+    window.Reveal.slide(1, 1, -1);
   });
 
   await page.waitForFunction(() => {
@@ -402,12 +598,12 @@ test('same-h vertical pullback exact-locks to the requested stack child', async 
 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+    return status.indices.h === 1 && status.indices.v === 1 && status.indices.f === -1;
   });
 
   let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
   expect(status.navigation.canGoDown).toBe(false);
   expect(status.navigation.canGoForward).toBe(false);
 
@@ -418,14 +614,14 @@ test('same-h vertical pullback exact-locks to the requested stack child', async 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
-      && status.indices.v === 0
+      && status.indices.v === 1
       && status.indices.f === -1
       && status.navigation.canGoDown === false
       && status.navigation.canGoForward === false;
   });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
   expect(status.navigation.canGoDown).toBe(false);
   expect(status.navigation.canGoForward).toBe(false);
 });
@@ -502,18 +698,9 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
   });
 
   await sendCommand(page, 'setStudentBoundary', {
-    indices: { h: 1, v: 0, f: -1 },
+    indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
-  });
-
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
-  });
-
-  await page.evaluate(() => {
-    window.Reveal.next();
   });
 
   await page.waitForFunction(() => {
@@ -629,7 +816,7 @@ test('student keyboard map enables only allowed directions and blocks overview k
   expect(config.keyboard[39]).toBeUndefined();
 });
 
-test('student touch swipe uses fragments within the boundary and blocks horizontal escape', async ({ page }) => {
+test('student touch swipe uses top-slide fragments within the boundary and blocks horizontal escape', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
   await page.evaluate(() => {
@@ -637,12 +824,19 @@ test('student touch swipe uses fragments within the boundary and blocks horizont
   });
 
   await sendCommand(page, 'setStudentBoundary', {
-    indices: { h: 1, v: 0, f: -1 },
+    indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
-    syncToBoundary: true,
+    syncToBoundary: false,
   });
 
-  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().indices.h === 1);
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+  });
 
   async function swipeLeft() {
     return page.evaluate(() => {
