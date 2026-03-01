@@ -599,6 +599,65 @@ test('setting a boundary ahead updates the release without pulling the student f
   });
 });
 
+test('explicit horizontal release ranges reveal all fragments on flat slides inside the range', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 3, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(2, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 2
+      && status.navigation.canGoForward === true;
+  });
+
+  const fragmentState = await page.evaluate(() => {
+    const slide = document.querySelector('.reveal .slides > section:nth-of-type(3)');
+    const fragments = Array.from(slide.querySelectorAll('.fragment'));
+    return {
+      visibleCount: fragments.filter((fragment) => fragment.classList.contains('visible')).length,
+      suppressedCount: fragments.filter((fragment) => fragment.classList.contains('syncdeck-suppressed-future')).length,
+    };
+  });
+
+  expect(fragmentState).toEqual({ visibleCount: 3, suppressedCount: 0 });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 3
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.prev();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 2;
+  });
+});
+
 test('student can rewind off an explicit-boundary flat slide and return to the latest instructor fragment', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -830,7 +889,7 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
       && status.indices.v === 0
-      && status.indices.f === -1;
+      && status.indices.f === 0;
   });
 
   await page.evaluate(() => {
@@ -839,12 +898,12 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
+    return status.indices.h === 1 && status.indices.v === 1 && status.indices.f === -1;
   });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 2, v: 0, f: -1 });
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
   expect(status.navigation.maxIndices).toEqual({ h: 2, v: 0, f: -1 });
   expect(status.navigation.canGoForward).toBe(true);
 });

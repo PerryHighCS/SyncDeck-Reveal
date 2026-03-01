@@ -228,17 +228,58 @@
     return fragments.length ? fragments.length - 1 : -1;
   }
 
-  function normalizeStudentStackChildIndices(ctx, indices) {
+  function hasExplicitHorizontalReleaseRange(ctx) {
+    if (ctx.state.role !== 'student' || !ctx.state.hasExplicitBoundary) {
+      return false;
+    }
+    if (!Number.isFinite(ctx.state.releaseStartH) || !Number.isFinite(ctx.state.releaseEndH)) {
+      return false;
+    }
+    return Number(ctx.state.releaseStartH) !== Number(ctx.state.releaseEndH);
+  }
+
+  function isStudentReleasedFlatSlide(ctx, indices) {
     const current = normalizeIndices(indices);
-    if (ctx.state.role !== 'student' || current.v === 0) {
+    if (ctx.state.role !== 'student' || current.v !== 0) {
+      return false;
+    }
+    if (!hasExplicitHorizontalReleaseRange(ctx)) {
+      return false;
+    }
+
+    const startH = Math.min(Number(ctx.state.releaseStartH), Number(ctx.state.releaseEndH));
+    const endH = Math.max(Number(ctx.state.releaseStartH), Number(ctx.state.releaseEndH));
+    if (current.h < startH || current.h > endH) {
+      return false;
+    }
+
+    const exactBoundary = exactTopSlideBoundary(ctx);
+    return !(exactBoundary && exactBoundary.h === current.h);
+  }
+
+  function normalizeStudentVisibleIndices(ctx, indices) {
+    const current = normalizeIndices(indices);
+    if (ctx.state.role !== 'student') {
       return current;
     }
 
-    return {
-      h: current.h,
-      v: current.v,
-      f: revealAllFragmentsIndexForSlide(current),
-    };
+    if (current.v > 0) {
+      return {
+        h: current.h,
+        v: current.v,
+        f: revealAllFragmentsIndexForSlide(current),
+      };
+    }
+
+    if (isStudentReleasedFlatSlide(ctx, current)) {
+      return {
+        h: current.h,
+        v: current.v,
+        f: revealAllFragmentsIndexForSlide(current),
+      };
+    }
+
+    return current;
   }
 
   function rememberTopSlideFragment(ctx, indices) {
@@ -294,6 +335,7 @@
   }
 
   function canAdvanceRightWithinHF(ctx, nav) {
+    if (isStudentReleasedFlatSlide(ctx, nav.current)) return false;
     if (!hasForwardFragmentStep(ctx.deck)) return false;
     if (nav.current.v !== 0) return false;
 
@@ -305,6 +347,7 @@
   }
 
   function canRewindLeftWithinHF(ctx, nav) {
+    if (isStudentReleasedFlatSlide(ctx, nav.current)) return false;
     if (!hasBackwardFragmentStep(ctx.deck)) return false;
     if (!nav.canGoBack) return false;
     return nav.current.v === 0;
@@ -387,7 +430,7 @@
           return ctx.deck.slide?.(target.h, target.v, target.f);
         }
         if (nav.canGoLeft && hasHorizontalRoute) {
-          const target = { h: current.h - 1, v: 0, f: -1 };
+          const target = normalizeStudentVisibleIndices(ctx, { h: current.h - 1, v: 0, f: -1 });
           debugLog(() => ['horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav }]);
           return ctx.deck.slide?.(target.h, target.v, target.f);
         }
@@ -401,7 +444,7 @@
         return ctx.deck.slide?.(target.h, target.v, target.f);
       }
       if (nav.canGoRight && hasHorizontalRoute) {
-        const target = { h: current.h + 1, v: 0, f: -1 };
+        const target = normalizeStudentVisibleIndices(ctx, { h: current.h + 1, v: 0, f: -1 });
         debugLog(() => ['horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav }]);
         return ctx.deck.slide?.(target.h, target.v, target.f);
       }
@@ -928,6 +971,14 @@
             return undefined;
           }
           if (
+            methodName === 'prev'
+            && isStudentReleasedFlatSlide(ctx, nav.current)
+            && nav.canGoLeft
+            && !canRewindLeftWithinHF(ctx, nav)
+          ) {
+            return moveHorizontal(ctx, 'left');
+          }
+          if (
             methodName === 'next'
             && nav.canGoRight
             && !nav.canGoDown
@@ -1065,7 +1116,7 @@
       : incoming;
 
     return {
-      applied: normalizeStudentStackChildIndices(ctx, applied),
+      applied: normalizeStudentVisibleIndices(ctx, applied),
       syncedBoundary: incoming,
     };
   }
@@ -1111,7 +1162,7 @@
       ? requestedBoundary
       : null;
     const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
-    let lastAllowedTarget = current;
+    let lastAllowedTarget = normalizeStudentVisibleIndices(ctx, current);
 
     // Notify the storyboard so it can display the boundary marker for all roles.
     window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
@@ -1123,15 +1174,16 @@
       // student forward on its own. Only snap when the student is already past
       // the new boundary; later synced instructor movement can still pull them.
       if (isPastBoundary) {
-        ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
-        lastAllowedTarget = snapTarget;
+        const normalizedSnapTarget = normalizeStudentVisibleIndices(ctx, snapTarget);
+        ctx.deck.slide(normalizedSnapTarget.h, normalizedSnapTarget.v, normalizedSnapTarget.f);
+        lastAllowedTarget = normalizedSnapTarget;
       }
     }
 
     // Reset the allowed-position cache for each explicit boundary session so a
     // later snap-back cannot reuse a stale v/f location from an older boundary
     // on the same horizontal slide.
-    ctx.state.lastAllowedStudentIndices = normalizeIndices(lastAllowedTarget);
+    ctx.state.lastAllowedStudentIndices = normalizeStudentVisibleIndices(ctx, lastAllowedTarget);
 
     // Update navigation controls to reflect new boundary.
     updateNavigationControls(ctx);
@@ -1175,7 +1227,7 @@
     if (ctx.state.role !== 'student') return;
     if (!ctx.state.studentMaxIndices) return;
 
-    const current = normalizeStudentStackChildIndices(ctx, ctx.deck.getIndices());
+    const current = normalizeStudentVisibleIndices(ctx, ctx.deck.getIndices());
     const max = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
     const lastAllowed = ctx.state.lastAllowedStudentIndices
       ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
