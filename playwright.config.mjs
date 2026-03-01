@@ -7,5 +7,6 @@ export default defineConfig({
   reporter: 'list',
   use: {
     headless: true,
+    hasTouch: true,
   },
 });

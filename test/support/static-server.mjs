@@ -19,6 +19,16 @@ export async function startStaticServer(rootDir) {
   const rootPath = path.resolve(rootDir);
 
   const server = http.createServer(async (req, res) => {
+    const method = req.method || 'GET';
+    if (method !== 'GET' && method !== 'HEAD') {
+      res.writeHead(405, {
+        'allow': 'GET, HEAD',
+        'content-type': 'text/plain; charset=utf-8',
+      });
+      res.end('Method not allowed');
+      return;
+    }
+
     const reqPath = new URL(req.url, 'http://127.0.0.1').pathname;
     let relativePath;
 
@@ -43,6 +53,10 @@ export async function startStaticServer(rootDir) {
     try {
       const contents = await readFile(filePath);
       res.writeHead(200, { 'content-type': contentTypeFor(filePath) });
+      if (method === 'HEAD') {
+        res.end();
+        return;
+      }
       res.end(contents);
     } catch {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
