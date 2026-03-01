@@ -93,6 +93,9 @@ test.describe('iframe host relay behavior', () => {
       releaseStartH: 0,
       syncToBoundary: true,
     });
+    await postCommand(page, 'setState', {
+      state: { indexh: 1, indexv: 0, indexf: -1 },
+    });
 
     await page.waitForFunction(() => {
       const frame = document.getElementById('deck-frame');
@@ -187,6 +190,49 @@ test.describe('iframe host relay behavior', () => {
     expect(warn.data.payload).toEqual({ message: 'Unknown command: notARealCommand' });
     expect(storyboardState.data.payload.overview).toBe(true);
     expect(storyboardState.data.payload.indices).toEqual({ h: 1, v: 1, f: -1 });
+  });
+
+  test('host receives paused and resumed state from instructor local actions', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'instructor' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'ready'));
+
+    await clearHostMessages(page);
+
+    await page.frameLocator('#deck-frame').locator('body').evaluate(() => {
+      window.Reveal.togglePause(true);
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'state' && entry.data?.payload?.paused === true);
+    });
+
+    let messages = await hostMessages(page);
+    let pausedState = messages.find((entry) => entry.data?.action === 'state' && entry.data?.payload?.paused === true);
+    expect(pausedState.data.role).toBe('instructor');
+    expect(pausedState.data.payload.reason).toBe('stateChanged');
+    expect(pausedState.data.payload.paused).toBe(true);
+
+    await clearHostMessages(page);
+
+    await page.frameLocator('#deck-frame').locator('body').evaluate(() => {
+      window.Reveal.togglePause(false);
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'state' && entry.data?.payload?.paused === false);
+    });
+
+    messages = await hostMessages(page);
+    const resumedState = messages.find((entry) => entry.data?.action === 'state' && entry.data?.payload?.paused === false);
+    expect(resumedState.data.role).toBe('instructor');
+    expect(resumedState.data.payload.reason).toBe('stateChanged');
+    expect(resumedState.data.payload.paused).toBe(false);
   });
 
   test('host receives chalkboard sync events from instructor iframe', async ({ page }) => {

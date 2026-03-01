@@ -697,6 +697,13 @@ body.storyboard-open > .reveal {
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Deck Signals</div>
+        <h2>What This Deck Exercises</h2>
         <div class="status-strip">
           <div class="status-card">
             <span class="label">Storyboard</span>
@@ -710,8 +717,8 @@ body.storyboard-open > .reveal {
           </div>
           <div class="status-card">
             <span class="label">Stack</span>
-            <span class="value">Two grouped stack regions</span>
-            <span class="note">Use the core 3-slide stack plus the later 2-slide stack for release and grouping checks.</span>
+            <span class="value">Three grouped stack regions</span>
+            <span class="note">Released <code>h</code> topics allow local vertical movement.</span>
           </div>
           <div class="status-card">
             <span class="label">Host rule</span>
@@ -730,8 +737,8 @@ body.storyboard-open > .reveal {
 
     <section>
       <div class="slide-inner">
-        <div class="deck-tag">Preflight</div>
-        <h2>Setup Before Running The Sequence</h2>
+        <div class="deck-tag">Preflight 1 / 2</div>
+        <h2>Prepare The Instructor And Student Views</h2>
         <div class="test-layout">
           <div class="panel">
             <h3>Prepare</h3>
@@ -744,14 +751,34 @@ body.storyboard-open > .reveal {
             <p class="layout-note">Recommended student policy for most checks: <code>studentCanNavigateBack: true</code>, <code>studentCanNavigateForward: false</code>.</p>
           </div>
           <div class="panel">
+            <h3>Watch For</h3>
+            <ul class="checklist expected-list">
+              <li>Role promotion happens only after the host sends the command.</li>
+              <li>The student begins constrained to the initial allowed boundary.</li>
+              <li>The deck is usable before any boundary manipulation begins.</li>
+            </ul>
+            <div class="callout">Do not start the scenario run until both iframes are clearly out of <code>standalone</code> mode and responding to host commands.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Preflight 2 / 2</div>
+        <h2>Verify Storyboard And Boundary Wiring</h2>
+        <div class="test-layout">
+          <div class="panel">
             <h3>Confirm</h3>
             <ul class="checklist expected-list">
-              <li>The student starts locked to slide 1 until the instructor grants a boundary.</li>
               <li>The storyboard strip opens with <code>M</code> and shows thumbnails for this deck.</li>
               <li>The student sees the custom storyboard strip, not Reveal's built-in overview grid.</li>
               <li>The host can set boundaries from the instructor storyboard.</li>
               <li>Stacked topics appear as grouped storyboard entries rather than a flat list of child-slide thumbnails.</li>
             </ul>
+          </div>
+          <div class="panel">
+            <h3>Signal Check</h3>
             <div class="signal-row">
               <div class="signal">
                 <span class="signal-label">Instructor</span>
@@ -772,41 +799,84 @@ body.storyboard-open > .reveal {
     </section>
 
     <section>
-      <div class="slide-inner">
-        <div class="deck-tag">Boundary + Fragments</div>
-        <h2>Student At Boundary With Remaining Fragments</h2>
-        <div class="test-layout">
-          <div class="panel">
-            <h3>Action</h3>
-            <ol class="checklist">
-              <li>Release the student to this slide only.</li>
-              <li>Advance the student until the boundary is this slide and the fragment rail below is still available.</li>
-              <li>Try advancing locally on the student view.</li>
-              <li>After the final fragment, try advancing one more time past the horizontal boundary.</li>
-            </ol>
-          </div>
-          <div class="panel">
-            <h3>Expected</h3>
-            <ul class="checklist expected-list">
-              <li>The student can advance through fragments on this slide.</li>
-              <li>The student cannot move to the next horizontal slide once the fragments are exhausted.</li>
-              <li>No flash onto the next slide should be visible before snap-back.</li>
-            </ul>
-            <div class="sample-lab">
-              <div class="sample-frame">
-                <h3>Fragment Rail</h3>
-                <p>Use the built-in fragments on this slide as the test material for same-slide forward movement.</p>
-                <div class="fragment-rail">
-                  <span class="fragment-pill fragment">Fragment A: released</span>
-                  <span class="fragment-pill fragment">Fragment B: still same <code>h</code></span>
-                  <span class="fragment-pill fragment">Fragment C: boundary should still hold</span>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Boundary + Fragments 1 / 2</div>
+          <h2>Top Stack Slide: Fragment Boundary Lock</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the student to this slide only.</li>
+                <li>Place the instructor on this slide before any fragment is revealed.</li>
+                <li>Try advancing locally on the student view before the instructor reveals Fragment A.</li>
+                <li>Reveal Fragment A from the instructor side, then try advancing locally again from the student view.</li>
+                <li>After Fragment B is revealed, rewind the student off this slide and step forward again to confirm they can only return to the instructor's current fragment.</li>
+                <li>After the final instructor-released fragment, try advancing one more time past the horizontal boundary.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Reference Rail</h3>
+              <div class="sample-lab">
+                <div class="sample-frame">
+                  <h3>Top-Slide Fragment Rail</h3>
+                  <p>These fragments live on the top child of the stack and should remain instructor-controlled.</p>
+                  <div class="fragment-rail">
+                    <span class="fragment-pill fragment">Fragment A: first release</span>
+                    <span class="fragment-pill fragment">Fragment B: same <code>h</code> replay target</span>
+                    <span class="fragment-pill fragment">Fragment C: boundary still holds</span>
+                  </div>
                 </div>
+                <ul class="checklist expected-list">
+                  <li>Before Fragment A is revealed, the student stays locked at the start of the slide.</li>
+                  <li>After the instructor reveals a fragment, the student is still capped at that instructor fragment position.</li>
+                  <li>If the student rewinds locally, they may move forward again only up to the instructor's current fragment.</li>
+                  <li>The student cannot move to the next horizontal slide while the boundary remains on this slide.</li>
+                  <li>No flash onto the next slide should be visible before snap-back.</li>
+                </ul>
               </div>
-              <div class="callout">If the student can move from this slide to the next horizontal slide without a new boundary grant, treat that as a failure.</div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Boundary + Fragments 2 / 2</div>
+          <h2>Lower Stack Slide: All Fragments Stay Visible</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Move down to this lower child after the stack has been released.</li>
+                <li>Confirm the student immediately sees every fragment marker on this slide.</li>
+                <li>Try local forward and backward navigation while staying on this child.</li>
+                <li>Verify the student is not blocked by fragment gating on this lower stack slide.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Lower-Child Fragment Check</h3>
+              <div class="sample-lab">
+                <div class="sample-frame">
+                  <h3>Lower-Slide Fragment Rail</h3>
+                  <p>These fragments live on a deeper child slide in the released stack and should already be visible to the student.</p>
+                  <div class="fragment-rail">
+                    <span class="fragment-pill fragment visible">Detail A: visible on entry</span>
+                    <span class="fragment-pill fragment visible">Detail B: not instructor-gated</span>
+                    <span class="fragment-pill fragment visible">Detail C: lower slide stays fully shown</span>
+                  </div>
+                </div>
+                <ul class="checklist expected-list">
+                  <li>All lower-slide fragments are visible as soon as the student lands on this child.</li>
+                  <li>Advancing locally on this child does not uncover any additional hidden fragment state.</li>
+                  <li>The student can still move within the released stack, but the horizontal boundary remains in place.</li>
+                </ul>
+                <div class="callout">Treat any hidden or instructor-gated fragment on this lower stack slide as a regression. Only the top child should use the exact fragment lock behavior.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </section>
 
     <section>
@@ -826,7 +896,7 @@ body.storyboard-open > .reveal {
             <div class="panel">
               <h3>Expected</h3>
               <ul class="checklist expected-list">
-                <li>Vertical movement within the released stack works.</li>
+                <li>Vertical movement within the released stack works without fragment-style locking on deeper child slides.</li>
                 <li>Horizontal movement to the next topic still does not work without a new release.</li>
               </ul>
               <div class="stack-map">
@@ -867,11 +937,11 @@ body.storyboard-open > .reveal {
             <div class="panel">
               <h3>Expected</h3>
               <ul class="checklist expected-list">
-                <li>The student remains inside the released stack.</li>
+                <li>The student remains inside the released stack and may move freely between child slides at this <code>h</code>.</li>
                 <li>Horizontal escape is blocked.</li>
                 <li>The storyboard highlights the released horizontal region, not each child as a separate release.</li>
               </ul>
-              <div class="callout">The important check here is that stack browsing stays local while the horizontal boundary still holds.</div>
+              <div class="callout">The important check here is that stack browsing stays local and unrestricted inside the released <code>h</code>, while the horizontal boundary still holds.</div>
             </div>
           </div>
         </div>
@@ -905,78 +975,77 @@ body.storyboard-open > .reveal {
     </section>
 
     <section>
-      <div class="slide-inner">
-        <div class="deck-tag">Same-h Pullback</div>
-        <h2>Later Fragment To Earlier Fragment Pullback</h2>
-        <div class="test-layout">
-          <div class="panel">
-            <h3>Action</h3>
-            <ol class="checklist">
-              <li>Release the student to this slide and advance to the last fragment.</li>
-              <li>Use the host to pull the student back to an earlier fragment on this same slide.</li>
-              <li>Try to re-advance locally after the pullback.</li>
-            </ol>
-          </div>
-          <div class="panel">
-            <h3>Expected</h3>
-            <ul class="checklist expected-list">
-              <li>The student snaps back to the requested earlier fragment.</li>
-              <li>The student cannot immediately re-advance past that exact pullback point.</li>
-            </ul>
-            <div class="sample-frame">
-              <h3>Pullback Rail</h3>
-              <div class="fragment-rail">
-                <span class="fragment-pill fragment">F1: baseline</span>
-                <span class="fragment-pill fragment">F2: pull back target</span>
-                <span class="fragment-pill fragment">F3: student should lose this after pullback</span>
-                <span class="fragment-pill fragment">F4: still blocked until a new boundary session</span>
-              </div>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Same-h Stack 1 / 2</div>
+          <h2>Stack Child Navigation Entry</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the student to this stack and keep them on the top child first.</li>
+                <li>Use the fragment rail here to verify the top-slide fragment pullback behavior before moving deeper into the stack.</li>
+                <li>Then navigate down to the next child in this stack for the child-navigation check while the student is on child 2.</li>
+              </ol>
             </div>
-            <p class="footnote">If a new boundary session later clears the exact lock, local advancement should work again when it is inside the newly allowed region.</p>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>This top child still uses the flat-slide fragment pullback behavior for the current <code>h</code>.</li>
+                <li>The deeper child-navigation behavior is tested after moving down within this same vertical stack.</li>
+              </ul>
+              <div class="sample-frame">
+                <h3>Top-Child Pullback Rail</h3>
+                <div class="fragment-rail">
+                  <span class="fragment-pill fragment">F1: baseline</span>
+                  <span class="fragment-pill fragment">F2: pull back target</span>
+                  <span class="fragment-pill fragment">F3: student should lose this after pullback</span>
+                  <span class="fragment-pill fragment">F4: still blocked until a new boundary session</span>
+                </div>
+              </div>
+              <p class="footnote">If a new boundary session later clears the exact lock, local advancement should work again when it is inside the newly allowed region.</p>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section>
-      <div class="slide-inner">
-        <div class="deck-tag">Same-h Pullback</div>
-        <h2>Deeper Stack Child To Earlier Stack Child Pullback</h2>
-        <div class="test-layout">
-          <div class="panel">
-            <h3>Action</h3>
-            <ol class="checklist">
-              <li>Release the vertical stack and move the student to stack child 2 or 3.</li>
-              <li>Pull the boundary back to child 1 on the same <code>h</code>.</li>
-              <li>Try moving down again locally from the student side.</li>
-            </ol>
-          </div>
-          <div class="panel">
-            <h3>Expected</h3>
-            <ul class="checklist expected-list">
-              <li>The student snaps back to the requested earlier child.</li>
-              <li>Deeper child slides stay blocked until the host establishes a new allowed session.</li>
-            </ul>
-            <div class="stack-map">
-              <div class="stack-node">
-                <span class="step">Pullback target</span>
-                <strong>Child 1</strong>
-                <p>Student should land here after the host moves the boundary back.</p>
-              </div>
-              <div class="stack-node">
-                <span class="step">Current student</span>
-                <strong>Child 2</strong>
-                <p>Use this as the "student is already ahead" state.</p>
-              </div>
-              <div class="stack-node">
-                <span class="step">Blocked after pullback</span>
-                <strong>Child 3</strong>
-                <p>Student should not be able to re-enter deeper children immediately.</p>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Same-h Pullback 2 / 2</div>
+          <h2>Instructor Moves Within Same Released Stack</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the vertical stack and move the student to stack child 2.</li>
+                <li>Move the instructor around within that same stack or back to the top slide on the same <code>h</code>.</li>
+                <li>Confirm the student stays on their current child slide unless the instructor leaves this horizontal topic entirely.</li>
+                <li>Return the student to the top slide and verify the top-slide fragment limit now reflects the instructor's current position.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>Same-<code>h</code> instructor movement does not pull the student up or down inside the released stack.</li>
+                <li>The student's local position inside the stack remains intact until the instructor moves to a different horizontal slide.</li>
+                <li>If the student later returns to the top slide, the top-slide fragment limit matches the instructor's current fragment for that <code>h</code>.</li>
+              </ul>
+              <div class="stack-map">
+                <div class="stack-node">
+                  <span class="step">Top slide</span>
+                  <strong>Child 1</strong>
+                  <p>Instructor fragment progress here updates the top-slide lock when the student comes back to this slide.</p>
+                </div>
+                <div class="stack-node">
+                  <span class="step">Student local</span>
+                  <strong>Child 2</strong>
+                  <p>Use this as the student-held local stack position.</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </section>
 
     <section>
@@ -1038,6 +1107,7 @@ body.storyboard-open > .reveal {
               <ul class="checklist expected-list">
                 <li>The storyboard shows a second stack badge for this topic.</li>
                 <li>The grouped entry stays anchored to one horizontal position while the active child indicator moves within the stack.</li>
+                <li>Once this stack's <code>h</code> is released, the child slides remain locally navigable without top-slide fragment-style locking.</li>
                 <li>Releasing this stack does not flatten it into two separate horizontal thumbnails.</li>
               </ul>
               <div class="stack-map">
@@ -1130,7 +1200,7 @@ body.storyboard-open > .reveal {
             <h3>Result</h3>
             <ul class="checklist">
               <li>Pass/fail per scenario</li>
-              <li>Whether both stack regions stayed grouped correctly in the storyboard</li>
+              <li>Whether all three stack regions stayed grouped correctly in the storyboard</li>
               <li>Any visible flicker or transient navigation escape</li>
               <li>Any mismatch between manual behavior and the automated suite</li>
             </ul>

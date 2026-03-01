@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 
 import { startStaticServer } from '../support/static-server.mjs';
+import { sendCommand } from '../support/iframe-sync-helpers.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '../..');
@@ -57,6 +58,43 @@ const revealCss = `
   }
 `;
 
+async function stubManualDeckAssets(page) {
+  await page.route('https://unpkg.com/reveal.js@*/dist/reveal.js', async (route) => {
+    await route.fulfill({
+      contentType: 'text/javascript; charset=utf-8',
+      body: revealScript,
+    });
+  });
+
+  await page.route('https://unpkg.com/reveal.js@*/dist/reveal.css', async (route) => {
+    await route.fulfill({
+      contentType: 'text/css; charset=utf-8',
+      body: revealCss,
+    });
+  });
+
+  await page.route('https://unpkg.com/reveal.js@*/plugin/notes/notes.js', async (route) => {
+    await route.fulfill({
+      contentType: 'text/javascript; charset=utf-8',
+      body: 'window.RevealNotes = { id: "RevealNotes", init() {} };',
+    });
+  });
+
+  await page.route('**/chalkboard/chalkboard.js', async (route) => {
+    await route.fulfill({
+      contentType: 'text/javascript; charset=utf-8',
+      body: `
+        window.RevealChalkboard = {
+          id: 'RevealChalkboard',
+          init() {},
+          configure() {},
+          getData() { return null; }
+        };
+      `,
+    });
+  });
+}
+
 test.describe('manual regression lab storyboard thumbnails', () => {
   let server;
 
@@ -69,40 +107,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
   });
 
   test('renders fixed-size storyboard thumbnails for the manual lab deck', async ({ page }) => {
-    await page.route('https://unpkg.com/reveal.js@*/dist/reveal.js', async (route) => {
-      await route.fulfill({
-        contentType: 'text/javascript; charset=utf-8',
-        body: revealScript,
-      });
-    });
-
-    await page.route('https://unpkg.com/reveal.js@*/dist/reveal.css', async (route) => {
-      await route.fulfill({
-        contentType: 'text/css; charset=utf-8',
-        body: revealCss,
-      });
-    });
-
-    await page.route('https://unpkg.com/reveal.js@*/plugin/notes/notes.js', async (route) => {
-      await route.fulfill({
-        contentType: 'text/javascript; charset=utf-8',
-        body: 'window.RevealNotes = { id: "RevealNotes", init() {} };',
-      });
-    });
-
-    await page.route('**/chalkboard/chalkboard.js', async (route) => {
-      await route.fulfill({
-        contentType: 'text/javascript; charset=utf-8',
-        body: `
-          window.RevealChalkboard = {
-            id: 'RevealChalkboard',
-            init() {},
-            configure() {},
-            getData() { return null; }
-          };
-        `,
-      });
-    });
+    await stubManualDeckAssets(page);
 
     await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
 
@@ -152,7 +157,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     });
 
     expect(metrics.thumbCount).toBe(metrics.topLevelSlides);
-    expect(metrics.stackBadgeCount).toBe(2);
+    expect(metrics.stackBadgeCount).toBe(4);
     expect(metrics.thumbWidth).toBeGreaterThan(200);
     expect(metrics.thumbWidth).toBeLessThan(225);
     expect(metrics.thumbHeight).toBeGreaterThan(145);
@@ -170,5 +175,159 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     expect(metrics.openOffsetVar).toBe(`${Math.ceil(metrics.storyboardHeight)}px`);
     expect(Math.abs(metrics.revealTranslateY)).toBeGreaterThanOrEqual(Math.floor(metrics.storyboardHeight));
     expect(Math.abs(metrics.revealTranslateY)).toBeLessThanOrEqual(Math.ceil(metrics.storyboardHeight) + 1);
+  });
+
+  test('top stack boundary slide lets the student rewind off slide 5 and return to released fragments', async ({ page }) => {
+    await stubManualDeckAssets(page);
+
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.RevealIframeSyncAPI.setRole('student');
+    });
+
+    await sendCommand(page, 'clearBoundary', {}, 'manual-regression-lab');
+    await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+    for (const fragmentIndex of [0, 1]) {
+      await sendCommand(page, 'setState', {
+        state: { indexh: 4, indexv: 0, indexf: fragmentIndex },
+      }, 'manual-regression-lab');
+
+      await page.waitForFunction((targetFragment) => {
+        const status = window.RevealIframeSyncAPI.getStatus();
+        return status.indices.h === 4
+          && status.indices.v === 0
+          && status.indices.f === targetFragment
+          && status.navigation.canGoForward === false;
+      }, fragmentIndex);
+
+      const rewindSteps = fragmentIndex + 2;
+      for (let step = 0; step < rewindSteps; step += 1) {
+        await page.evaluate(() => {
+          window.Reveal.prev();
+        });
+      }
+
+      await page.waitForFunction(() => {
+        const status = window.RevealIframeSyncAPI.getStatus();
+        return status.indices.h === 3
+          && status.indices.v === 0
+          && status.indices.f === -1
+          && status.navigation.canGoForward === true;
+      });
+
+      const returnSteps = fragmentIndex + 2;
+      for (let step = 0; step < returnSteps; step += 1) {
+        await page.evaluate(() => {
+          window.Reveal.next();
+        });
+      }
+
+      await page.waitForFunction((targetFragment) => {
+        const status = window.RevealIframeSyncAPI.getStatus();
+        return status.indices.h === 4
+          && status.indices.v === 0
+          && status.indices.f === targetFragment
+          && status.navigation.canGoForward === false;
+      }, fragmentIndex);
+    }
+  });
+
+  test('lower child in the boundary stack exposes its full fragment rail when synced there', async ({ page }) => {
+    await stubManualDeckAssets(page);
+
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.RevealIframeSyncAPI.setRole('student');
+    });
+
+    await sendCommand(page, 'clearBoundary', {}, 'manual-regression-lab');
+    await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 1, indexf: 2 },
+    }, 'manual-regression-lab');
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 1
+        && status.indices.f === 2;
+    });
+
+    const lowerSlideMetrics = await page.evaluate(() => {
+      const slide = document.querySelector('.slides > section:nth-of-type(5) > section:nth-of-type(2)');
+      const fragments = Array.from(slide?.querySelectorAll('.fragment') || []);
+      return {
+        fragmentCount: fragments.length,
+        visibleCount: fragments.filter((fragment) => fragment.classList.contains('visible')).length,
+        labels: fragments.map((fragment) => fragment.textContent?.trim() || ''),
+      };
+    });
+
+    expect(lowerSlideMetrics.fragmentCount).toBe(3);
+    expect(lowerSlideMetrics.visibleCount).toBe(3);
+    expect(lowerSlideMetrics.labels).toEqual([
+      'Detail A: visible on entry',
+      'Detail B: not instructor-gated',
+      'Detail C: lower slide stays fully shown',
+    ]);
+  });
+
+  test('student stays on the lower child when instructor moves down and back up within the boundary stack', async ({ page }) => {
+    await stubManualDeckAssets(page);
+
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.RevealIframeSyncAPI.setRole('student');
+    });
+
+    await sendCommand(page, 'setStudentBoundary', {
+      indices: { h: 4, v: 0, f: 0 },
+      releaseStartH: 0,
+      syncToBoundary: true,
+    }, 'manual-regression-lab');
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 0, indexf: 0 },
+    }, 'manual-regression-lab');
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 0
+        && status.indices.f === 0;
+    });
+
+    await page.evaluate(() => {
+      window.Reveal.down();
+    });
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 1
+        && status.indices.f === 2;
+    });
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 1, indexf: 2 },
+    }, 'manual-regression-lab');
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 0, indexf: 0 },
+    }, 'manual-regression-lab');
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 1
+        && status.indices.f === 2
+        && status.navigation.canGoUp === true
+        && status.navigation.canGoForward === false;
+    });
   });
 });

@@ -40,14 +40,23 @@ Network note:
 
 1. Release the student to a horizontal slide that still contains fragments.
 2. Advance the student to the last released horizontal slide.
-3. Verify fragment advance is still allowed when intended.
-4. Verify horizontal advance past the boundary is blocked.
-5. Verify the student does not flash onto the next horizontal slide before
+3. With the instructor still before the first fragment on that slide, verify the
+   student cannot reveal fragments locally.
+4. Reveal a fragment from the instructor side and verify the student remains
+   locked to that exact fragment position rather than running ahead locally.
+5. Rewind the student locally and verify they can move forward again only up to
+   the instructor's currently revealed fragment.
+6. Verify horizontal advance past the boundary is blocked.
+7. Verify the student does not flash onto the next horizontal slide before
    snapping back.
 
 Expected:
 
-- Fragment progression within the released slide still works.
+- On a flat slide at the boundary `h`, the student remains locked to the
+  instructor's current fragment position.
+- If the student rewinds locally on that flat slide, they may move forward
+  again only up to the instructor's current fragment, replaying any earlier
+  same-slide fragment steps on the way back.
 - The student cannot move to the next horizontal slide.
 - The storyboard continues to show the correct boundary/released range.
 
@@ -61,6 +70,8 @@ Expected:
 Expected:
 
 - Vertical navigation inside the released stack remains available.
+- Once the stack's `h` is released, deeper child slides are locally navigable
+  without the flat-slide fragment lock behavior used on the top slide.
 - Horizontal escape past the boundary remains blocked.
 
 ### Pullback from later fragment to earlier fragment on the same slide
@@ -74,16 +85,18 @@ Expected:
 - The student is snapped back to the requested fragment position.
 - The student cannot immediately re-advance past that exact pullback point.
 
-### Pullback from deeper stack child to earlier stack child on the same `h`
+### Instructor movement within the same released stack
 
 1. Let the student advance to a deeper child within a released vertical stack.
-2. Pull the boundary back to an earlier child on the same `h`.
-3. Try to move down again locally from the student side.
+2. Move the instructor around within that same stack or back to the top slide on the same `h`.
+3. Verify the student stays on their current child slide.
+4. Return the student to the top slide and verify the top-slide fragment limit reflects the instructor's current fragment.
 
 Expected:
 
-- The student is snapped back to the requested stack child.
-- The student cannot immediately re-enter deeper children past the pullback.
+- Same-`h` instructor movement does not pull the student up or down inside the released stack.
+- The student's local position inside the stack remains intact until the instructor moves to a different `h`.
+- When the student returns to the top slide, the top-slide fragment lock matches the instructor's current fragment at that `h`.
 
 ### No-back mode with vertical `up` available
 
