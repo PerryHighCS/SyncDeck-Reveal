@@ -20,7 +20,7 @@
  */
 
 (function () {
-  const IFRAME_SYNC_VERSION = '1.1.0';
+  const IFRAME_SYNC_VERSION = '2.0.0';
   const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
   const DEBUG_LOG_ENABLED = !!window.__SYNCDECK_DEBUG;
 

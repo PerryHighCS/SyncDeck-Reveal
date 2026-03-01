@@ -589,10 +589,6 @@ test('student keeps local lower stack child when instructor moves down and back 
     state: { indexh: 1, indexv: 0, indexf: 0 },
   });
 
-  await sendCommand(page, 'setState', {
-    state: { indexh: 1, indexv: 0, indexf: 0 },
-  });
-
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
@@ -871,14 +867,6 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
 
   await page.evaluate(() => {
     window.Reveal.slide(1, 0, 0);
-  });
-
-  await sendCommand(page, 'setState', {
-    state: { indexh: 1, indexv: 0, indexf: 0 },
-  });
-
-  await sendCommand(page, 'setState', {
-    state: { indexh: 1, indexv: 0, indexf: 0 },
   });
 
   await sendCommand(page, 'setState', {

@@ -7,7 +7,7 @@ This document defines the `postMessage` protocol used by `reveal-iframe-sync.js`
 ```json
 {
   "type": "reveal-sync",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "action": "ready",
   "deckId": "2d-arrays",
   "role": "student",
@@ -553,7 +553,7 @@ function isCompatibleProtocol(hostVersion, messageVersion) {
 }
 
 // Usage in message handler
-const HOST_SYNC_PROTOCOL = '1.1.0';
+const HOST_SYNC_PROTOCOL = '2.0.0';
 if (!isCompatibleProtocol(HOST_SYNC_PROTOCOL, data.version)) {
   // Ignore message or request iframe reload/update
   return;
