@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncDeck Manual Regression Lab</title>
+
+<link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="../chalkboard/chalkboard.css">
+
+<style>
+body,
+.reveal-viewport {
+  background:
+    radial-gradient(circle at top right, rgba(255, 173, 92, 0.16), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(103, 219, 198, 0.18), transparent 24%),
+    linear-gradient(180deg, #10161b 0%, #182228 52%, #0d1317 100%);
+  background-color: #10161b;
+}
+
+.reveal {
+  background: transparent;
+  color: #f3efe5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.reveal h1,
+.reveal h2,
+.reveal h3,
+.reveal h4,
+.reveal h5,
+.reveal h6 {
+  color: #f6f0e6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  margin: 0;
+}
+
+.reveal p,
+.reveal li,
+.reveal blockquote {
+  color: rgba(243, 239, 229, 0.78);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.reveal a {
+  color: #67dbc6;
+}
+
+.reveal a:hover {
+  color: #95efe0;
+}
+
+.reveal :not(pre) > code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  background: rgba(103, 219, 198, 0.12);
+  border: 1px solid rgba(103, 219, 198, 0.26);
+  border-radius: 6px;
+  color: #95efe0;
+  padding: 2px 7px;
+}
+
+:root {
+  --bg: #10161b;
+  --panel: rgba(19, 26, 31, 0.84);
+  --panel-strong: rgba(23, 32, 38, 0.96);
+  --text: #f3efe5;
+  --text-muted: rgba(243, 239, 229, 0.72);
+  --text-dim: rgba(243, 239, 229, 0.46);
+  --accent: #67dbc6;
+  --accent-warm: #ffad5c;
+  --accent-red: #ff7361;
+  --line: rgba(243, 239, 229, 0.14);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+  --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --title: 92px;
+  --h2: 52px;
+  --h3: 28px;
+  --body: 24px;
+  --small: 18px;
+  --tiny: 15px;
+  --code: 20px;
+  --pad: 68px;
+  --gap: 24px;
+  --gap-sm: 14px;
+  --gap-lg: 36px;
+}
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.reveal .slides > section,
+.reveal .slides > section > section {
+  height: 100%;
+  padding: 0 !important;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.slide-inner {
+  width: 100%;
+  height: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--gap);
+  position: relative;
+  overflow: hidden;
+}
+
+.slide-inner::before {
+  content: '';
+  position: absolute;
+  inset: 28px;
+  border: 1px solid rgba(243, 239, 229, 0.08);
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.reveal h1 {
+  font-size: var(--title);
+}
+
+.reveal h2 {
+  font-size: var(--h2);
+}
+
+.reveal h3 {
+  font-size: var(--h3);
+}
+
+.reveal p,
+.reveal li {
+  font-size: var(--body);
+  line-height: 1.45;
+}
+
+.reveal ul,
+.reveal ol {
+  margin-left: 28px;
+}
+
+.reveal li + li {
+  margin-top: 8px;
+}
+
+.reveal pre {
+  margin: 0;
+  box-shadow: none;
+  width: auto;
+  text-align: left;
+}
+
+.reveal pre code {
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--code);
+}
+
+.reveal .controls {
+  color: var(--accent);
+  z-index: 30;
+}
+
+.reveal .controls .enabled {
+  opacity: 0.95;
+}
+
+.reveal .progress {
+  height: 4px;
+}
+
+.reveal .progress span {
+  background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+}
+
+.reveal .slide-number {
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+}
+
+.deck-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 219, 198, 0.28);
+  background: rgba(103, 219, 198, 0.08);
+  color: var(--accent);
+  font-size: var(--tiny);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.5fr 0.9fr;
+  gap: 30px;
+  align-items: end;
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.hero-copy p {
+  max-width: 900px;
+  font-size: 28px;
+  color: rgba(243, 239, 229, 0.82);
+}
+
+.hero-meta {
+  display: grid;
+  gap: 14px;
+}
+
+.meta-card,
+.panel,
+.status-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+}
+
+.meta-card {
+  padding: 24px 26px;
+}
+
+.meta-card h3 {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.meta-card p {
+  font-size: var(--small);
+  color: var(--text-muted);
+}
+
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.status-card {
+  padding: 18px 20px;
+  min-height: 112px;
+}
+
+.status-card .label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--accent);
+  font-size: var(--tiny);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-card .value {
+  display: block;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.status-card .note {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: 16px;
+}
+
+.test-layout {
+  display: grid;
+  grid-template-columns: 0.95fr 1.4fr;
+  gap: 24px;
+  min-height: 640px;
+}
+
+.panel {
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel h3 {
+  color: var(--accent-warm);
+  font-size: 21px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel p {
+  font-size: var(--small);
+  color: var(--text-muted);
+}
+
+.checklist {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.checklist li {
+  list-style: none;
+  margin: 0;
+  padding-left: 24px;
+  position: relative;
+  font-size: var(--small);
+  color: var(--text-muted);
+}
+
+.checklist li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 5px rgba(103, 219, 198, 0.12);
+}
+
+.expected-list li::before {
+  background: var(--accent-warm);
+  box-shadow: 0 0 0 5px rgba(255, 173, 92, 0.12);
+}
+
+.signal-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.signal {
+  padding: 16px 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(243, 239, 229, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.signal .signal-label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.signal .signal-value {
+  display: block;
+  font-size: 18px;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.layout-note {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(243, 239, 229, 0.1);
+  color: var(--text-dim);
+  font-size: 16px;
+}
+
+.sample-lab {
+  display: grid;
+  gap: 16px;
+}
+
+.sample-frame {
+  border-radius: 22px;
+  border: 1px solid rgba(243, 239, 229, 0.12);
+  background:
+    linear-gradient(135deg, rgba(255, 173, 92, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  padding: 24px;
+  min-height: 210px;
+}
+
+.sample-frame h3 {
+  margin-bottom: 14px;
+}
+
+.sample-frame p {
+  font-size: var(--small);
+}
+
+.fragment-rail {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.fragment-pill {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 219, 198, 0.26);
+  background: rgba(103, 219, 198, 0.08);
+  color: var(--accent);
+  font-size: 16px;
+  font-family: var(--font-mono);
+}
+
+.stack-map {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.stack-node {
+  padding: 20px;
+  min-height: 132px;
+  border-radius: 20px;
+  border: 1px solid rgba(243, 239, 229, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.stack-node .step {
+  color: var(--accent-warm);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.stack-node strong {
+  display: block;
+  margin: 12px 0 8px;
+  font-size: 24px;
+}
+
+.stack-node p {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.callout {
+  padding: 16px 18px;
+  border-radius: 18px;
+  border-left: 4px solid var(--accent-red);
+  background: rgba(255, 115, 97, 0.08);
+  color: rgba(243, 239, 229, 0.9);
+  font-size: var(--small);
+}
+
+.network-note {
+  border-left-color: var(--accent-warm);
+  background: rgba(255, 173, 92, 0.1);
+}
+
+.log-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.log-card {
+  padding: 22px;
+  min-height: 170px;
+  border-radius: 20px;
+  border: 1px solid rgba(243, 239, 229, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.log-card h3 {
+  margin-bottom: 14px;
+  font-size: 22px;
+}
+
+.log-card p,
+.log-card li {
+  font-size: var(--small);
+}
+
+.footnote {
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.storyboard {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateY(100%);
+  transition: transform 240ms ease;
+  padding: 16px 18px 20px;
+  background: rgba(11, 15, 18, 0.92);
+  border-top: 1px solid rgba(243, 239, 229, 0.12);
+  backdrop-filter: blur(16px);
+  z-index: 40;
+}
+
+.storyboard-track {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+body.storyboard-open .storyboard {
+  transform: translateY(0);
+}
+
+body.storyboard-open .reveal {
+  transform: translateY(-108px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storyboard,
+  body.storyboard-open .reveal {
+    transition: none;
+  }
+}
+</style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">SyncDeck Manual Regression Lab</div>
+        <div class="hero">
+          <div class="hero-copy">
+            <h1>Manual Test Deck</h1>
+            <p>
+              This deck is a purpose-built lab for running the remaining real-browser
+              checks around boundaries, vertical stacks, same-<code>h</code> pullbacks,
+              storyboard refreshes, and mobile touch behavior.
+            </p>
+          </div>
+          <div class="hero-meta">
+            <div class="meta-card">
+              <h3>How to use it</h3>
+              <p>Load it in an instructor host and one student iframe. Every slide tells you what to do, what state to create, and what result should be visible.</p>
+            </div>
+            <div class="meta-card">
+              <h3>Deck ID</h3>
+              <p><code>manual-regression-lab</code></p>
+            </div>
+          </div>
+        </div>
+        <div class="status-strip">
+          <div class="status-card">
+            <span class="label">Storyboard</span>
+            <span class="value"><code>M</code> toggles strip</span>
+            <span class="note">Use the strip to set or inspect boundaries.</span>
+          </div>
+          <div class="status-card">
+            <span class="label">Fragments</span>
+            <span class="value">Used for same-<code>h</code> pullback tests</span>
+            <span class="note">Slides later in the deck include built-in fragment rails.</span>
+          </div>
+          <div class="status-card">
+            <span class="label">Stack</span>
+            <span class="value">Slides 4.1 to 4.3</span>
+            <span class="note">Use these child slides for stack release and no-back checks.</span>
+          </div>
+          <div class="status-card">
+            <span class="label">Host rule</span>
+            <span class="value">Promote via <code>setRole</code></span>
+            <span class="note">The runtime starts in standalone mode until the host sets the role.</span>
+          </div>
+        </div>
+        <div class="callout network-note">
+          This deck requires external network access to <code>unpkg.com</code>,
+          <code>fonts.googleapis.com</code>, and <code>fonts.gstatic.com</code>.
+          If those hosts are blocked, fix asset loading before treating any manual
+          regression result as meaningful.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Preflight</div>
+        <h2>Setup Before Running The Sequence</h2>
+        <div class="test-layout">
+          <div class="panel">
+            <h3>Prepare</h3>
+            <ol class="checklist">
+              <li>Open one instructor page and at least one student iframe.</li>
+              <li>Promote the instructor iframe with <code>setRole: 'instructor'</code>.</li>
+              <li>Promote the student iframe with <code>setRole: 'student'</code>.</li>
+              <li>Keep devtools open if you want to watch <code>postMessage</code> traffic.</li>
+            </ol>
+            <p class="layout-note">Recommended student policy for most checks: <code>studentCanNavigateBack: true</code>, <code>studentCanNavigateForward: false</code>.</p>
+          </div>
+          <div class="panel">
+            <h3>Confirm</h3>
+            <ul class="checklist expected-list">
+              <li>The student starts locked to slide 1 until the instructor grants a boundary.</li>
+              <li>The storyboard strip opens with <code>M</code> and shows thumbnails for this deck.</li>
+              <li>The student sees the custom storyboard strip, not Reveal's built-in overview grid.</li>
+              <li>The host can set boundaries from the instructor storyboard.</li>
+            </ul>
+            <div class="signal-row">
+              <div class="signal">
+                <span class="signal-label">Instructor</span>
+                <span class="signal-value">Boundary buttons visible in storyboard</span>
+              </div>
+              <div class="signal">
+                <span class="signal-label">Student</span>
+                <span class="signal-value">No boundary buttons, only the marker/result</span>
+              </div>
+              <div class="signal">
+                <span class="signal-label">Role state</span>
+                <span class="signal-value"><code>standalone</code> should be gone once promoted</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Boundary + Fragments</div>
+        <h2>Student At Boundary With Remaining Fragments</h2>
+        <div class="test-layout">
+          <div class="panel">
+            <h3>Action</h3>
+            <ol class="checklist">
+              <li>Release the student to this slide only.</li>
+              <li>Advance the student until the boundary is this slide and the fragment rail below is still available.</li>
+              <li>Try advancing locally on the student view.</li>
+              <li>After the final fragment, try advancing one more time past the horizontal boundary.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>Expected</h3>
+            <ul class="checklist expected-list">
+              <li>The student can advance through fragments on this slide.</li>
+              <li>The student cannot move to the next horizontal slide once the fragments are exhausted.</li>
+              <li>No flash onto the next slide should be visible before snap-back.</li>
+            </ul>
+            <div class="sample-lab">
+              <div class="sample-frame">
+                <h3>Fragment Rail</h3>
+                <p>Use the built-in fragments on this slide as the test material for same-slide forward movement.</p>
+                <div class="fragment-rail">
+                  <span class="fragment-pill fragment">Fragment A: released</span>
+                  <span class="fragment-pill fragment">Fragment B: still same <code>h</code></span>
+                  <span class="fragment-pill fragment">Fragment C: boundary should still hold</span>
+                </div>
+              </div>
+              <div class="callout">If the student can move from this slide to the next horizontal slide without a new boundary grant, treat that as a failure.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Vertical Stack 1 / 3</div>
+          <h2>Released Stack: Entry Slide</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the student to this horizontal stack.</li>
+                <li>Confirm the student lands on stack child 1.</li>
+                <li>Move down within the stack from the student side.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>Vertical movement within the released stack works.</li>
+                <li>Horizontal movement to the next topic still does not work without a new release.</li>
+              </ul>
+              <div class="stack-map">
+                <div class="stack-node">
+                  <span class="step">Child 1</span>
+                  <strong>Entry</strong>
+                  <p>Start here after the host grants the stack boundary.</p>
+                </div>
+                <div class="stack-node">
+                  <span class="step">Child 2</span>
+                  <strong>Middle</strong>
+                  <p>Move here to verify down movement stays inside the same <code>h</code>.</p>
+                </div>
+                <div class="stack-node">
+                  <span class="step">Child 3</span>
+                  <strong>Deep</strong>
+                  <p>Use this child for the no-back and same-<code>h</code> pullback checks.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Vertical Stack 2 / 3</div>
+          <h2>Released Stack: Middle Child</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>From child 1, move down to this child.</li>
+                <li>Try horizontal advance from here without changing the boundary.</li>
+                <li>Use this slide to verify the student is still inside the same topic region.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>The student remains inside the released stack.</li>
+                <li>Horizontal escape is blocked.</li>
+                <li>The storyboard highlights the released horizontal region, not each child as a separate release.</li>
+              </ul>
+              <div class="callout">The important check here is that stack browsing stays local while the horizontal boundary still holds.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Vertical Stack 3 / 3</div>
+          <h2>No-Back Stack Check</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Enable <code>studentCanNavigateBack: false</code> on the host side.</li>
+                <li>Move the student down to this child.</li>
+                <li>Attempt <code>prev()</code>, up-arrow navigation, and a backward swipe if applicable.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>The student stays on the last allowed same-<code>h</code> position.</li>
+                <li>Moving back up the stack is blocked in no-back mode.</li>
+                <li>No transient rewind should be visible.</li>
+              </ul>
+              <div class="callout">This slide is specifically here to exercise the remaining no-back vertical <code>up</code> behavior in a real browser.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Same-h Pullback</div>
+        <h2>Later Fragment To Earlier Fragment Pullback</h2>
+        <div class="test-layout">
+          <div class="panel">
+            <h3>Action</h3>
+            <ol class="checklist">
+              <li>Release the student to this slide and advance to the last fragment.</li>
+              <li>Use the host to pull the student back to an earlier fragment on this same slide.</li>
+              <li>Try to re-advance locally after the pullback.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>Expected</h3>
+            <ul class="checklist expected-list">
+              <li>The student snaps back to the requested earlier fragment.</li>
+              <li>The student cannot immediately re-advance past that exact pullback point.</li>
+            </ul>
+            <div class="sample-frame">
+              <h3>Pullback Rail</h3>
+              <div class="fragment-rail">
+                <span class="fragment-pill fragment">F1: baseline</span>
+                <span class="fragment-pill fragment">F2: pull back target</span>
+                <span class="fragment-pill fragment">F3: student should lose this after pullback</span>
+                <span class="fragment-pill fragment">F4: still blocked until a new boundary session</span>
+              </div>
+            </div>
+            <p class="footnote">If a new boundary session later clears the exact lock, local advancement should work again when it is inside the newly allowed region.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Same-h Pullback</div>
+        <h2>Deeper Stack Child To Earlier Stack Child Pullback</h2>
+        <div class="test-layout">
+          <div class="panel">
+            <h3>Action</h3>
+            <ol class="checklist">
+              <li>Release the vertical stack and move the student to stack child 2 or 3.</li>
+              <li>Pull the boundary back to child 1 on the same <code>h</code>.</li>
+              <li>Try moving down again locally from the student side.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>Expected</h3>
+            <ul class="checklist expected-list">
+              <li>The student snaps back to the requested earlier child.</li>
+              <li>Deeper child slides stay blocked until the host establishes a new allowed session.</li>
+            </ul>
+            <div class="stack-map">
+              <div class="stack-node">
+                <span class="step">Pullback target</span>
+                <strong>Child 1</strong>
+                <p>Student should land here after the host moves the boundary back.</p>
+              </div>
+              <div class="stack-node">
+                <span class="step">Current student</span>
+                <strong>Child 2</strong>
+                <p>Use this as the "student is already ahead" state.</p>
+              </div>
+              <div class="stack-node">
+                <span class="step">Blocked after pullback</span>
+                <strong>Child 3</strong>
+                <p>Student should not be able to re-enter deeper children immediately.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Storyboard</div>
+        <h2>Role Changes And Storyboard Refresh</h2>
+        <div class="test-layout">
+          <div class="panel">
+            <h3>Action</h3>
+            <ol class="checklist">
+              <li>As instructor, open the storyboard with <code>M</code> and set a boundary from the strip.</li>
+              <li>Switch the iframe role from instructor to student, then back to instructor.</li>
+              <li>Re-open or refresh the storyboard strip after each role change.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>Expected</h3>
+            <ul class="checklist expected-list">
+              <li>Boundary buttons appear only for instructors.</li>
+              <li>Old local boundary markers clear when the role resets.</li>
+              <li>Released-range highlighting stays accurate after re-render.</li>
+              <li>Live-region announcements occur only on actual boundary changes.</li>
+            </ul>
+            <div class="signal-row">
+              <div class="signal">
+                <span class="signal-label">Instructor</span>
+                <span class="signal-value">Flag buttons visible, boundary marker toggleable</span>
+              </div>
+              <div class="signal">
+                <span class="signal-label">Student</span>
+                <span class="signal-value">No flag buttons, only current boundary state</span>
+              </div>
+              <div class="signal">
+                <span class="signal-label">After reset</span>
+                <span class="signal-value">No stale local marker should survive</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Touch / Mobile</div>
+        <h2>Mobile Swipe Validation</h2>
+        <div class="test-layout">
+          <div class="panel">
+            <h3>Action</h3>
+            <ol class="checklist">
+              <li>Open the student view on a real phone or in device emulation.</li>
+              <li>Try a blocked horizontal swipe at the current boundary.</li>
+              <li>Try a horizontal swipe on a slide where only fragment movement remains.</li>
+              <li>Try vertical swipes inside the released stack.</li>
+              <li>Repeat with no-back mode enabled.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>Expected</h3>
+            <ul class="checklist expected-list">
+              <li>Blocked horizontal swipe does not escape the boundary.</li>
+              <li>Fragment-only swipe stays inside the allowed slide.</li>
+              <li>Vertical swipe still works inside the released stack.</li>
+              <li>No-back mode blocks backward same-<code>h</code> touch navigation.</li>
+            </ul>
+            <div class="callout">This is the one area the current fixture harness approximates but does not fully validate. Treat a clean mobile pass here as the final confidence check.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="slide-inner">
+        <div class="deck-tag">Sign-Off</div>
+        <h2>Record The Run</h2>
+        <div class="log-grid">
+          <div class="log-card">
+            <h3>Environment</h3>
+            <ul class="checklist">
+              <li>Deck path: <code>test/manual-regression-lab.html</code></li>
+              <li>Browser or device used</li>
+              <li>Instructor/student embedding mode</li>
+            </ul>
+          </div>
+          <div class="log-card">
+            <h3>Result</h3>
+            <ul class="checklist">
+              <li>Pass/fail per scenario</li>
+              <li>Any visible flicker or transient navigation escape</li>
+              <li>Any mismatch between manual behavior and the automated suite</li>
+            </ul>
+          </div>
+          <div class="log-card">
+            <h3>If Something Fails</h3>
+            <p>Capture the slide number, role state, boundary state, and whether the issue happened in direct keyboard input, touch input, or host-driven sync.</p>
+          </div>
+          <div class="log-card">
+            <h3>Optional Extras</h3>
+            <p>Use the chalkboard while running the deck if you also want a quick sanity pass on live drawing sync in the same instructor/student setup.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div id="storyboard" class="storyboard" aria-hidden="true">
+  <div id="storyboard-track" class="storyboard-track"></div>
+</div>
+
+<script src="https://unpkg.com/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://unpkg.com/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script src="../chalkboard/chalkboard.js"></script>
+<script src="../reveal-storyboard.js"></script>
+<script src="../reveal-iframe-sync.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const sameOrigin = window.location.origin && window.location.origin !== 'null'
+  ? window.location.origin
+  : '*';
+const hostOrigin = params.get('hostOrigin') || sameOrigin;
+const allowedOrigins = (params.get('allowedOrigins') || hostOrigin)
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+Reveal.initialize({
+  hash: true,
+  hashOneBasedIndex: true,
+  keyboard: true,
+  touch: true,
+  loop: false,
+  transition: 'fade',
+  transitionSpeed: 'fast',
+  backgroundTransition: 'none',
+  center: false,
+  controls: true,
+  controlsLayout: 'edges',
+  progress: true,
+  slideNumber: 'c/t',
+  width: 1600,
+  height: 900,
+  margin: 0.04,
+  minScale: 0.2,
+  maxScale: 2.5,
+  fragments: true,
+  fragmentInURL: false,
+  iframeSync: {
+    deckId: 'manual-regression-lab',
+    hostOrigin,
+    allowedOrigins,
+    studentCanNavigateBack: true,
+    studentCanNavigateForward: false,
+  },
+  plugins: [RevealNotes, RevealChalkboard, RevealIframeSync].filter(Boolean),
+});
+
+if (window.initRevealStoryboard) {
+  window.initRevealStoryboard({
+    reveal: Reveal,
+    storyboardId: 'storyboard',
+    trackId: 'storyboard-track',
+    toggleKey: 'm',
+  });
+}
+</script>
+</body>
+</html>

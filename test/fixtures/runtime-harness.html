@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncDeck Runtime Harness</title>
+</head>
+<body>
+  <div class="reveal">
+    <aside class="controls">
+      <button class="navigate-left" type="button" aria-label="Previous slide"></button>
+      <button class="navigate-right" type="button" aria-label="Next slide"></button>
+    </aside>
+    <div class="slides">
+      <section>
+        <h2>Intro</h2>
+        <p>Fixture slide one.</p>
+      </section>
+      <section>
+        <section>
+          <h2>Concept Stack</h2>
+          <p>First child in a vertical stack.</p>
+          <p class="fragment">A fragment inside the first child.</p>
+        </section>
+        <section>
+          <h2>Concept Detail</h2>
+          <p>Second child in a vertical stack.</p>
+        </section>
+      </section>
+      <section>
+        <h2>Third</h2>
+        <p>Fixture slide three.</p>
+      </section>
+      <section>
+        <h2>Fourth</h2>
+        <p>Fixture slide four.</p>
+      </section>
+    </div>
+  </div>
+
+  <div id="storyboard" class="storyboard" aria-hidden="true">
+    <div id="storyboard-track" class="storyboard-track"></div>
+  </div>
+
+  <script src="./helpers/reveal-stub.js"></script>
+  <script src="../../reveal-iframe-sync.js"></script>
+  <script src="../../reveal-storyboard.js"></script>
+  <script>
+    const harnessConfig = window.__syncHarnessConfig || {};
+    const revealOptions = harnessConfig.revealOptions || {};
+
+    window.Reveal = window.createRevealStub(revealOptions);
+    window.__syncHarness = {
+      reveal: window.Reveal,
+      syncApi: window.RevealIframeSync.init(window.Reveal),
+    };
+
+    if (window.initRevealStoryboard) {
+      window.initRevealStoryboard({
+        reveal: window.Reveal,
+        storyboardId: 'storyboard',
+        trackId: 'storyboard-track',
+        toggleKey: harnessConfig.toggleKey || 'm',
+      });
+    }
+  </script>
+</body>
+</html>
