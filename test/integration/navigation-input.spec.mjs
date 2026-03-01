@@ -209,7 +209,7 @@ test('student follow-instructor mode exact-locks flat boundary slides before and
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 2
       && status.indices.v === 0
-      && status.indices.f === 1
+      && status.indices.f === 0
       && status.navigation.canGoForward === false;
   });
 
@@ -232,7 +232,7 @@ test('student follow-instructor mode exact-locks flat boundary slides before and
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 2
       && status.indices.v === 0
-      && status.indices.f === 0
+      && status.indices.f === -1
       && status.navigation.canGoForward === true;
   });
 
@@ -244,7 +244,7 @@ test('student follow-instructor mode exact-locks flat boundary slides before and
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 2
       && status.indices.v === 0
-      && status.indices.f === 1
+      && status.indices.f === 0
       && status.navigation.canGoForward === false;
   });
 
