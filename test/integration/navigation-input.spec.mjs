@@ -452,6 +452,61 @@ test('student stays on the top child when instructor moves deeper within the sam
   });
 });
 
+test('student keeps local lower stack child when instructor moves down and back up within the same released stack', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: 0 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.navigation.canGoUp === true
+      && status.navigation.canGoForward === false;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 1, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.navigation.canGoUp === true
+      && status.navigation.canGoForward === false;
+  });
+});
+
 test('student can rewind off an explicit-boundary flat slide and return to the latest instructor fragment', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

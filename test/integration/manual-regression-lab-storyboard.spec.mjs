@@ -275,4 +275,55 @@ test.describe('manual regression lab storyboard thumbnails', () => {
       'Detail C: lower slide stays fully shown',
     ]);
   });
+
+  test('student stays on the lower child when instructor moves down and back up within the boundary stack', async ({ page }) => {
+    await stubManualDeckAssets(page);
+
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.RevealIframeSyncAPI.setRole('student');
+    });
+
+    await sendCommand(page, 'setStudentBoundary', {
+      indices: { h: 4, v: 0, f: 0 },
+      releaseStartH: 0,
+      syncToBoundary: true,
+    }, 'manual-regression-lab');
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 0
+        && status.indices.f === 0;
+    });
+
+    await page.evaluate(() => {
+      window.Reveal.down();
+    });
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 1
+        && status.indices.f === 2;
+    });
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 1, indexf: 2 },
+    }, 'manual-regression-lab');
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 0, indexf: 0 },
+    }, 'manual-regression-lab');
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 1
+        && status.indices.f === 2
+        && status.navigation.canGoUp === true
+        && status.navigation.canGoForward === false;
+    });
+  });
 });
