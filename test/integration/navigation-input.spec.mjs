@@ -1125,6 +1125,69 @@ test('student keyboard handling enables only allowed directions and blocks overv
   expect(status.overview).toBe(false);
 });
 
+test('student non-arrow keyboard shortcuts preserve prev/next and h/l navigation semantics', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1;
+  });
+
+  await page.keyboard.press('PageUp');
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.keyboard.press('PageDown');
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1;
+  });
+
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+
+  await page.keyboard.press('h');
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.keyboard.press('l');
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1;
+  });
+});
+
 test('instructor role keeps Reveal keyboard enabled for unrestricted shortcuts', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

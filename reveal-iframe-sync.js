@@ -1582,7 +1582,12 @@
 
       const isVerticalKey = event.key === 'ArrowUp' || event.key === 'ArrowDown';
       const isHorizontalKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
-      if (!isVerticalKey && !isHorizontalKey) return;
+      const lowerKey = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+      const isStudentPrevKey = ctx.state.role === 'student'
+        && (event.key === 'PageUp' || lowerKey === 'h');
+      const isStudentNextKey = ctx.state.role === 'student'
+        && (event.key === 'PageDown' || event.key === ' ' || event.code === 'Space' || lowerKey === 'l');
+      if (!isVerticalKey && !isHorizontalKey && !isStudentPrevKey && !isStudentNextKey) return;
 
       if (ctx.state.role === 'student' && ctx.state.pauseLockedByHost) {
         event.preventDefault();
@@ -1623,6 +1628,18 @@
         ctx.deck.left?.();
       } else if (event.key === 'ArrowRight') {
         ctx.deck.right?.();
+      } else if (isStudentPrevKey) {
+        if (lowerKey === 'h') {
+          ctx.deck.left?.();
+        } else {
+          ctx.deck.prev?.();
+        }
+      } else if (isStudentNextKey) {
+        if (lowerKey === 'l') {
+          ctx.deck.right?.();
+        } else {
+          ctx.deck.next?.();
+        }
       }
     };
 
