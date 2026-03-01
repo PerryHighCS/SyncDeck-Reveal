@@ -157,7 +157,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     });
 
     expect(metrics.thumbCount).toBe(metrics.topLevelSlides);
-    expect(metrics.stackBadgeCount).toBe(3);
+    expect(metrics.stackBadgeCount).toBe(4);
     expect(metrics.thumbWidth).toBeGreaterThan(200);
     expect(metrics.thumbWidth).toBeLessThan(225);
     expect(metrics.thumbHeight).toBeGreaterThan(145);
@@ -177,7 +177,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     expect(Math.abs(metrics.revealTranslateY)).toBeLessThanOrEqual(Math.ceil(metrics.storyboardHeight) + 1);
   });
 
-  test('flat boundary slide lets the student rewind off slide 3 and return to released fragments', async ({ page }) => {
+  test('top stack boundary slide lets the student rewind off slide 5 and return to released fragments', async ({ page }) => {
     await stubManualDeckAssets(page);
 
     await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
@@ -191,12 +191,12 @@ test.describe('manual regression lab storyboard thumbnails', () => {
 
     for (const fragmentIndex of [0, 1]) {
       await sendCommand(page, 'setState', {
-        state: { indexh: 2, indexv: 0, indexf: fragmentIndex },
+        state: { indexh: 4, indexv: 0, indexf: fragmentIndex },
       }, 'manual-regression-lab');
 
       await page.waitForFunction((targetFragment) => {
         const status = window.RevealIframeSyncAPI.getStatus();
-        return status.indices.h === 2
+        return status.indices.h === 4
           && status.indices.v === 0
           && status.indices.f === targetFragment
           && status.navigation.canGoForward === false;
@@ -211,7 +211,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
 
       await page.waitForFunction(() => {
         const status = window.RevealIframeSyncAPI.getStatus();
-        return status.indices.h === 1
+        return status.indices.h === 3
           && status.indices.v === 0
           && status.indices.f === -1
           && status.navigation.canGoForward === true;
@@ -226,11 +226,53 @@ test.describe('manual regression lab storyboard thumbnails', () => {
 
       await page.waitForFunction((targetFragment) => {
         const status = window.RevealIframeSyncAPI.getStatus();
-        return status.indices.h === 2
+        return status.indices.h === 4
           && status.indices.v === 0
           && status.indices.f === targetFragment
           && status.navigation.canGoForward === false;
       }, fragmentIndex);
     }
+  });
+
+  test('lower child in the boundary stack exposes its full fragment rail when synced there', async ({ page }) => {
+    await stubManualDeckAssets(page);
+
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.RevealIframeSyncAPI.setRole('student');
+    });
+
+    await sendCommand(page, 'clearBoundary', {}, 'manual-regression-lab');
+    await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 1, indexf: 2 },
+    }, 'manual-regression-lab');
+
+    await page.waitForFunction(() => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 4
+        && status.indices.v === 1
+        && status.indices.f === 2;
+    });
+
+    const lowerSlideMetrics = await page.evaluate(() => {
+      const slide = document.querySelector('.slides > section:nth-of-type(5) > section:nth-of-type(2)');
+      const fragments = Array.from(slide?.querySelectorAll('.fragment') || []);
+      return {
+        fragmentCount: fragments.length,
+        visibleCount: fragments.filter((fragment) => fragment.classList.contains('visible')).length,
+        labels: fragments.map((fragment) => fragment.textContent?.trim() || ''),
+      };
+    });
+
+    expect(lowerSlideMetrics.fragmentCount).toBe(3);
+    expect(lowerSlideMetrics.visibleCount).toBe(3);
+    expect(lowerSlideMetrics.labels).toEqual([
+      'Detail A: visible on entry',
+      'Detail B: not instructor-gated',
+      'Detail C: lower slide stays fully shown',
+    ]);
   });
 });
