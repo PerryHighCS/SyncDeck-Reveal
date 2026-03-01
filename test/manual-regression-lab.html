@@ -710,7 +710,7 @@ body.storyboard-open > .reveal {
           </div>
           <div class="status-card">
             <span class="label">Stack</span>
-            <span class="value">Two grouped stack regions</span>
+            <span class="value">Three grouped stack regions</span>
             <span class="note">At a released <code>h</code>, stack child slides are free locally even when the top slide uses fragment locking.</span>
           </div>
           <div class="status-card">
@@ -783,7 +783,7 @@ body.storyboard-open > .reveal {
               <li>Place the instructor on this slide before any fragment is revealed.</li>
               <li>Try advancing locally on the student view before the instructor reveals Fragment A.</li>
               <li>Reveal Fragment A from the instructor side, then try advancing locally again from the student view.</li>
-              <li>After Fragment B is revealed, move the student back one step locally and confirm they can return to Fragment B but not continue past it.</li>
+              <li>After Fragment B is revealed, rewind the student off this slide and confirm they can step forward back through the slide start and intermediate fragments until they reach Fragment B again, but not continue past it.</li>
               <li>After the final instructor-released fragment, try advancing one more time past the horizontal boundary.</li>
             </ol>
           </div>
@@ -792,7 +792,7 @@ body.storyboard-open > .reveal {
             <ul class="checklist expected-list">
               <li>Before the instructor reveals Fragment A, the student stays locked at the start of this slide.</li>
               <li>After the instructor reveals a fragment, the student is still locked to that current instructor fragment position.</li>
-              <li>If the student rewinds locally, they may move forward again only up to the instructor's current revealed fragment.</li>
+              <li>If the student rewinds locally, they may move forward again only up to the instructor's current revealed fragment, replaying any earlier same-slide fragment steps on the way back.</li>
               <li>The student cannot move to the next horizontal slide once the fragments are exhausted.</li>
               <li>No flash onto the next slide should be visible before snap-back.</li>
             </ul>
@@ -909,78 +909,77 @@ body.storyboard-open > .reveal {
     </section>
 
     <section>
-      <div class="slide-inner">
-        <div class="deck-tag">Same-h Pullback</div>
-        <h2>Later Fragment To Earlier Fragment Pullback</h2>
-        <div class="test-layout">
-          <div class="panel">
-            <h3>Action</h3>
-            <ol class="checklist">
-              <li>Release the student to this slide and advance to the last fragment.</li>
-              <li>Use the host to pull the student back to an earlier fragment on this same slide.</li>
-              <li>Try to re-advance locally after the pullback.</li>
-            </ol>
-          </div>
-          <div class="panel">
-            <h3>Expected</h3>
-            <ul class="checklist expected-list">
-              <li>The student snaps back to the requested earlier fragment.</li>
-              <li>The student cannot immediately re-advance past that exact pullback point.</li>
-            </ul>
-            <div class="sample-frame">
-              <h3>Pullback Rail</h3>
-              <div class="fragment-rail">
-                <span class="fragment-pill fragment">F1: baseline</span>
-                <span class="fragment-pill fragment">F2: pull back target</span>
-                <span class="fragment-pill fragment">F3: student should lose this after pullback</span>
-                <span class="fragment-pill fragment">F4: still blocked until a new boundary session</span>
-              </div>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Same-h Stack 1 / 2</div>
+          <h2>Stack Child Navigation Entry</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the student to this stack and keep them on the top child first.</li>
+                <li>Use the fragment rail here to verify the top-slide fragment pullback behavior before moving deeper into the stack.</li>
+                <li>Then navigate down to the next child in this stack for the child-navigation check while the student is on child 2.</li>
+              </ol>
             </div>
-            <p class="footnote">If a new boundary session later clears the exact lock, local advancement should work again when it is inside the newly allowed region.</p>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>This top child still uses the flat-slide fragment pullback behavior for the current <code>h</code>.</li>
+                <li>The deeper child-navigation behavior is tested after moving down within this same vertical stack.</li>
+              </ul>
+              <div class="sample-frame">
+                <h3>Top-Child Pullback Rail</h3>
+                <div class="fragment-rail">
+                  <span class="fragment-pill fragment">F1: baseline</span>
+                  <span class="fragment-pill fragment">F2: pull back target</span>
+                  <span class="fragment-pill fragment">F3: student should lose this after pullback</span>
+                  <span class="fragment-pill fragment">F4: still blocked until a new boundary session</span>
+                </div>
+              </div>
+              <p class="footnote">If a new boundary session later clears the exact lock, local advancement should work again when it is inside the newly allowed region.</p>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section>
-      <div class="slide-inner">
-        <div class="deck-tag">Same-h Pullback</div>
-        <h2>Deeper Stack Child To Earlier Stack Child Pullback</h2>
-        <div class="test-layout">
-          <div class="panel">
-            <h3>Action</h3>
-            <ol class="checklist">
-              <li>Release the vertical stack and move the student to stack child 2 or 3.</li>
-              <li>Pull the boundary back to child 1 on the same <code>h</code>.</li>
-              <li>Try moving down again locally from the student side.</li>
-            </ol>
-          </div>
-          <div class="panel">
-            <h3>Expected</h3>
-            <ul class="checklist expected-list">
-              <li>The student snaps back to the requested earlier child.</li>
-              <li>Deeper child slides stay blocked until the host establishes a new allowed session.</li>
-            </ul>
-            <div class="stack-map">
-              <div class="stack-node">
-                <span class="step">Pullback target</span>
-                <strong>Child 1</strong>
-                <p>Student should land here after the host moves the boundary back.</p>
-              </div>
-              <div class="stack-node">
-                <span class="step">Current student</span>
-                <strong>Child 2</strong>
-                <p>Use this as the "student is already ahead" state.</p>
-              </div>
-              <div class="stack-node">
-                <span class="step">Blocked after pullback</span>
-                <strong>Child 3</strong>
-                <p>Student should not be able to re-enter deeper children immediately.</p>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Same-h Pullback 2 / 2</div>
+          <h2>Instructor Moves Within Same Released Stack</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the vertical stack and move the student to stack child 2.</li>
+                <li>Move the instructor around within that same stack or back to the top slide on the same <code>h</code>.</li>
+                <li>Confirm the student stays on their current child slide unless the instructor leaves this horizontal topic entirely.</li>
+                <li>Return the student to the top slide and verify the top-slide fragment limit now reflects the instructor's current position.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>Same-<code>h</code> instructor movement does not pull the student up or down inside the released stack.</li>
+                <li>The student's local position inside the stack remains intact until the instructor moves to a different horizontal slide.</li>
+                <li>If the student later returns to the top slide, the top-slide fragment limit matches the instructor's current fragment for that <code>h</code>.</li>
+              </ul>
+              <div class="stack-map">
+                <div class="stack-node">
+                  <span class="step">Top slide</span>
+                  <strong>Child 1</strong>
+                  <p>Instructor fragment progress here updates the top-slide lock when the student comes back to this slide.</p>
+                </div>
+                <div class="stack-node">
+                  <span class="step">Student local</span>
+                  <strong>Child 2</strong>
+                  <p>Use this as the student-held local stack position.</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </section>
 
     <section>
@@ -1135,7 +1134,7 @@ body.storyboard-open > .reveal {
             <h3>Result</h3>
             <ul class="checklist">
               <li>Pass/fail per scenario</li>
-              <li>Whether both stack regions stayed grouped correctly in the storyboard</li>
+              <li>Whether all three stack regions stayed grouped correctly in the storyboard</li>
               <li>Any visible flicker or transient navigation escape</li>
               <li>Any mismatch between manual behavior and the automated suite</li>
             </ul>

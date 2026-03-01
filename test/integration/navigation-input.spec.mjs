@@ -192,7 +192,7 @@ test('student follow-instructor mode exact-locks flat boundary slides before and
   });
 
   await page.evaluate(() => {
-    window.Reveal.next();
+    window.Reveal.right();
   });
 
   await page.waitForFunction(() => {
@@ -279,6 +279,133 @@ test('student can rewind off a flat boundary slide and return to the instructor 
   });
 });
 
+test('student keeps local stack position when instructor moves within the same released stack', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 1, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.studentBoundary?.h === 1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.studentBoundary?.h === 1;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
+  expect(status.navigation.canGoUp).toBe(true);
+  expect(status.navigation.canGoForward).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.navigation.canGoForward === true;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoDown === true;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+});
+
+test('student stays on the top child when instructor moves deeper within the same released stack', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.studentBoundary?.h === 1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 1, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.studentBoundary?.h === 1;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
+  expect(status.navigation.canGoDown).toBe(true);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+});
+
 test('student can rewind off an explicit-boundary flat slide and return to the latest instructor fragment', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -348,14 +475,14 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
   });
 
   await sendCommand(page, 'setStudentBoundary', {
-    indices: { h: 1, v: 0, f: -1 },
+    indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
   });
 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
   });
 
   await page.evaluate(() => {
@@ -364,12 +491,12 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
 
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
   });
 
   let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
 
   await page.evaluate(() => {
     window.Reveal.slide(1, 1, -1);
@@ -772,13 +899,7 @@ test('student keyboard map enables only allowed directions and blocks overview k
   let config = await latestDeckConfig(page);
   expect(config.overview).toBe(false);
   expect(config.touch).toBe(false);
-  expect(config.keyboard[27]).toBe('null');
-  expect(config.keyboard[79]).toBe('null');
-  expect(config.keyboard[70]).toBe('null');
-  expect(config.keyboard[39]).toBeUndefined();
-  expect(config.keyboard[76]).toBeUndefined();
-  expect(config.keyboard[34]).toBeUndefined();
-  expect(config.keyboard[32]).toBeUndefined();
+  expect(config.keyboard).toBe(false);
 
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
@@ -789,17 +910,7 @@ test('student keyboard map enables only allowed directions and blocks overview k
   config = await latestDeckConfig(page);
   expect(config.overview).toBe(false);
   expect(config.touch).toBe(true);
-  expect(config.keyboard[27]).toBe('null');
-  expect(config.keyboard[79]).toBe('null');
-  expect(config.keyboard[70]).toBe('null');
-  expect(config.keyboard[37]).toBe('left');
-  expect(config.keyboard[72]).toBe('left');
-  expect(config.keyboard[33]).toBe('prev');
-  expect(config.keyboard[34]).toBe('next');
-  expect(config.keyboard[32]).toBe('next');
-  expect(config.keyboard[40]).toBe('down');
-  expect(config.keyboard[39]).toBeUndefined();
-  expect(config.keyboard[76]).toBeUndefined();
+  expect(config.keyboard).toBe(false);
 
   await page.evaluate(() => {
     window.Reveal.slide(1, 1, -1);
@@ -811,9 +922,409 @@ test('student keyboard map enables only allowed directions and blocks overview k
   });
 
   config = await latestDeckConfig(page);
-  expect(config.keyboard[38]).toBe('up');
-  expect(config.keyboard[37]).toBe('left');
-  expect(config.keyboard[39]).toBeUndefined();
+  expect(config.keyboard).toBe(false);
+});
+
+test('right-arrow semantics fall back to next on fragment-only forward locks', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false
+      && status.navigation.canGoRight === false;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.left();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoForward === true
+      && status.navigation.canGoRight === false;
+  });
+
+  let config = await latestDeckConfig(page);
+  expect(config.keyboard).toBe(false);
+  await expect(page.locator('.reveal .controls .navigate-right')).toHaveAttribute('aria-disabled', 'false');
+
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 1
+      && status.navigation.canGoForward === false;
+  });
+
+  config = await latestDeckConfig(page);
+  expect(config.keyboard).toBe(false);
+});
+
+test('right-arrow does not stand in for down when only stack descent is available', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: 0 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoDown === true
+      && status.navigation.canGoRight === false;
+  });
+
+  let config = await latestDeckConfig(page);
+  expect(config.keyboard).toBe(false);
+  await expect(page.locator('.reveal .controls .navigate-right')).toHaveAttribute('aria-disabled', 'true');
+
+  await page.evaluate(() => {
+    window.Reveal.right();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.locator('.reveal .controls .navigate-right').click({ force: true });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  config = await latestDeckConfig(page);
+  expect(config.keyboard).toBe(false);
+});
+
+test('instructor right-arrow and right control reveal fragments before horizontal moves and never descend a vertical stack', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+    window.Reveal.slide(1, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await page.locator('.reveal .controls .navigate-right').click();
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.locator('.reveal .controls .navigate-right').click();
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+});
+
+test('up/down navigation stays vertical and does not consume fragments', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: 0 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoDown === true;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.up();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+});
+
+test('up/down control buttons stay vertical and do not consume fragments', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: 0 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoDown === true;
+  });
+
+  await page.locator('.reveal .controls .navigate-down').click();
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  await page.locator('.reveal .controls .navigate-up').click();
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+});
+
+test('instructor up/down keys and controls stay vertical and do not consume fragments', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+    window.Reveal.slide(1, 0, 0);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.keyboard.press('ArrowDown');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  await page.keyboard.press('ArrowUp');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, 0);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.locator('.reveal .controls .navigate-down').click();
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  await page.locator('.reveal .controls .navigate-up').click();
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+});
+
+test('descending from a fragmented top stack slide suppresses unrevealed future fragments until return', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+    window.Reveal.slide(1, 0, 0);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    const extra = document.createElement('p');
+    extra.className = 'fragment';
+    extra.textContent = 'Hidden future fragment';
+    topSlide.appendChild(extra);
+    window.Reveal.slide(1, 0, 0);
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1;
+  });
+
+  let suppressed = await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    return Array.from(topSlide.querySelectorAll('.fragment')).map((fragment) => fragment.classList.contains('syncdeck-suppressed-future'));
+  });
+  expect(suppressed).toEqual([false, true]);
+
+  await page.evaluate(() => {
+    window.Reveal.up();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  suppressed = await page.evaluate(() => {
+    const topSlide = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(1)');
+    return Array.from(topSlide.querySelectorAll('.fragment')).map((fragment) => fragment.classList.contains('syncdeck-suppressed-future'));
+  });
+  expect(suppressed).toEqual([false, false]);
 });
 
 test('student touch swipe uses top-slide fragments within the boundary and blocks horizontal escape', async ({ page }) => {

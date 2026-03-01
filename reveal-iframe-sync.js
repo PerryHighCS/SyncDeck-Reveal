@@ -63,6 +63,20 @@
     window.parent.postMessage(message, normalizeOrigin(ctx.config.hostOrigin));
   }
 
+  function debugLog(...args) {
+    console.log('[RevealIframeSync]', ...args);
+  }
+
+  function describeElement(element) {
+    if (!(element instanceof Element)) return null;
+    return {
+      tag: element.tagName,
+      id: element.id || null,
+      className: typeof element.className === 'string' ? element.className : null,
+      ariaLabel: element.getAttribute?.('aria-label') || null,
+    };
+  }
+
   function ensureNavLockStyles() {
     if (document.getElementById(NAV_LOCK_STYLE_ID)) return;
 
@@ -71,16 +85,48 @@
     style.textContent = `
       .reveal .controls .navigate-left.disabled,
       .reveal .controls .navigate-right.disabled,
+      .reveal .controls .navigate-up.disabled,
+      .reveal .controls .navigate-down.disabled,
       .reveal .controls .navigate-left[aria-disabled="true"],
-      .reveal .controls .navigate-right[aria-disabled="true"] {
+      .reveal .controls .navigate-right[aria-disabled="true"],
+      .reveal .controls .navigate-up[aria-disabled="true"],
+      .reveal .controls .navigate-down[aria-disabled="true"] {
         animation: none !important;
       }
 
       .reveal .controls .navigate-left.disabled.highlight,
       .reveal .controls .navigate-right.disabled.highlight,
+      .reveal .controls .navigate-up.disabled.highlight,
+      .reveal .controls .navigate-down.disabled.highlight,
       .reveal .controls .navigate-left[aria-disabled="true"].highlight,
-      .reveal .controls .navigate-right[aria-disabled="true"].highlight {
+      .reveal .controls .navigate-right[aria-disabled="true"].highlight,
+      .reveal .controls .navigate-up[aria-disabled="true"].highlight,
+      .reveal .controls .navigate-down[aria-disabled="true"].highlight {
         animation: none !important;
+      }
+
+      .reveal .controls [data-syncdeck-blocked="true"] {
+        opacity: 0.18 !important;
+        filter: saturate(0) !important;
+        transform: none !important;
+      }
+
+      .reveal .controls [data-syncdeck-blocked="true"].highlight,
+      .reveal .controls [data-syncdeck-blocked="true"].fragmented,
+      .reveal .controls [data-syncdeck-blocked="true"].enabled {
+        animation: none !important;
+        opacity: 0.18 !important;
+      }
+
+      .reveal .controls [data-syncdeck-visible="false"] {
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+
+      .reveal .fragment.syncdeck-suppressed-future {
+        opacity: 0 !important;
+        visibility: hidden !important;
       }
     `;
 
@@ -151,6 +197,46 @@
     };
   }
 
+  function topLevelSlideHasVerticalChildren(h) {
+    const topLevelSlides = document.querySelectorAll('.reveal .slides > section');
+    const topLevelSlide = topLevelSlides[Number(h)];
+    if (!topLevelSlide) return false;
+    return !!topLevelSlide.querySelector(':scope > section');
+  }
+
+  function rememberTopSlideFragment(ctx, indices) {
+    const current = normalizeIndices(indices ?? ctx.deck.getIndices());
+    if (current.v !== 0) return;
+    if (!topLevelSlideHasVerticalChildren(current.h)) return;
+    ctx.state.topSlideFragmentsByH[current.h] = current.f;
+  }
+
+  function resolveTopSlideReturnFragment(ctx, h) {
+    const exactBoundary = exactTopSlideBoundary(ctx);
+    if (exactBoundary && exactBoundary.h === Number(h)) {
+      return exactBoundary.f;
+    }
+
+    const remembered = ctx.state.topSlideFragmentsByH?.[Number(h)];
+    return Number.isFinite(Number(remembered)) ? Number(remembered) : -1;
+  }
+
+  function suppressFutureFragmentsOnSlide(slide, currentFragmentIndex) {
+    if (!slide) return;
+    const fragments = Array.from(slide.querySelectorAll('.fragment'));
+    fragments.forEach((fragment, index) => {
+      const shouldSuppress = index > Number(currentFragmentIndex) && !fragment.classList.contains('visible');
+      fragment.classList.toggle('syncdeck-suppressed-future', shouldSuppress);
+    });
+  }
+
+  function clearSuppressedFutureFragments(scope) {
+    const root = scope || document;
+    root.querySelectorAll('.syncdeck-suppressed-future').forEach((fragment) => {
+      fragment.classList.remove('syncdeck-suppressed-future');
+    });
+  }
+
   function hasForwardFragmentStep(deck) {
     const currentSlide = deck.getCurrentSlide?.();
     if (!currentSlide) return false;
@@ -168,6 +254,145 @@
       : null;
     if (!exactBoundary) return null;
     return exactBoundary.v === 0 ? exactBoundary : null;
+  }
+
+  function canAdvanceRightWithinHF(ctx, nav) {
+    if (!hasForwardFragmentStep(ctx.deck)) return false;
+    if (nav.current.v !== 0) return false;
+
+    const exactBoundary = exactTopSlideBoundary(ctx);
+    if (!exactBoundary) return true;
+    if (nav.current.h !== exactBoundary.h) return true;
+
+    return nav.current.f < exactBoundary.f;
+  }
+
+  function canRewindLeftWithinHF(ctx, nav) {
+    if (!hasBackwardFragmentStep(ctx.deck)) return false;
+    return nav.current.v === 0;
+  }
+
+  function moveVertical(ctx, direction) {
+    const current = normalizeIndices(ctx.deck.getIndices());
+    const routes = getDirectionalRoutes(ctx.deck);
+    const canMoveVertically = direction === 'up' ? routes.hasUp : routes.hasDown;
+
+    debugLog('verticalMethod:start', {
+      methodName: direction,
+      role: ctx.state.role,
+      current,
+      routes,
+      canMoveVertically,
+      activeElement: describeElement(document.activeElement),
+    });
+    if (direction === 'down') {
+      console.trace('[RevealIframeSync] down trace');
+    }
+
+    if (ctx.state.role === 'student') {
+      const nav = buildNavigationStatus(ctx);
+      if (!(direction === 'up' ? nav.canGoUp : nav.canGoDown)) {
+        debugLog('verticalMethod:block', { methodName: direction, nav });
+        return undefined;
+      }
+    }
+
+    if (!canMoveVertically) {
+      debugLog('verticalMethod:noRoute', { methodName: direction, current, routes });
+      return undefined;
+    }
+
+    if (direction === 'down' && current.v === 0) {
+      rememberTopSlideFragment(ctx, current);
+      suppressFutureFragmentsOnSlide(ctx.deck.getCurrentSlide?.(), current.f);
+    }
+
+    const targetV = direction === 'up' ? current.v - 1 : current.v + 1;
+    const targetF = targetV === 0
+      ? resolveTopSlideReturnFragment(ctx, current.h)
+      : -1;
+
+    if (targetV === 0) {
+      clearSuppressedFutureFragments();
+    }
+
+    debugLog('verticalMethod:slide', {
+      methodName: direction,
+      from: current,
+      to: { h: current.h, v: targetV, f: targetF },
+    });
+    return ctx.deck.slide?.(current.h, targetV, targetF);
+  }
+
+  function moveHorizontal(ctx, direction) {
+    const current = normalizeIndices(ctx.deck.getIndices());
+    const routes = getDirectionalRoutes(ctx.deck);
+    const hasHorizontalRoute = direction === 'left' ? routes.hasLeft : routes.hasRight;
+    const hasFragmentStep = direction === 'left'
+      ? hasBackwardFragmentStep(ctx.deck)
+      : hasForwardFragmentStep(ctx.deck);
+
+    debugLog('horizontalMethod:start', {
+      methodName: direction,
+      role: ctx.state.role,
+      current,
+      routes,
+      hasHorizontalRoute,
+      hasFragmentStep,
+      activeElement: describeElement(document.activeElement),
+    });
+
+    if (ctx.state.role === 'student') {
+      const nav = buildNavigationStatus(ctx);
+      if (direction === 'left') {
+        if (canRewindLeftWithinHF(ctx, nav)) {
+          const target = { h: current.h, v: current.v, f: current.f - 1 };
+          debugLog('horizontalMethod:studentPrevFragment', { from: current, to: target, nav });
+          return ctx.deck.slide?.(target.h, target.v, target.f);
+        }
+        if (nav.canGoLeft && hasHorizontalRoute) {
+          const target = { h: current.h - 1, v: 0, f: -1 };
+          debugLog('horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav });
+          return ctx.deck.slide?.(target.h, target.v, target.f);
+        }
+        debugLog('horizontalMethod:studentBlocked', { methodName: direction, nav, current });
+        return undefined;
+      }
+
+      if (canAdvanceRightWithinHF(ctx, nav)) {
+        const target = { h: current.h, v: current.v, f: current.f + 1 };
+        debugLog('horizontalMethod:studentNextFragment', { from: current, to: target, nav });
+        return ctx.deck.slide?.(target.h, target.v, target.f);
+      }
+      if (nav.canGoRight && hasHorizontalRoute) {
+        const target = { h: current.h + 1, v: 0, f: -1 };
+        debugLog('horizontalMethod:studentSlideHorizontal', { from: current, to: target, nav });
+        return ctx.deck.slide?.(target.h, target.v, target.f);
+      }
+      debugLog('horizontalMethod:studentBlocked', { methodName: direction, nav, current });
+      return undefined;
+    }
+
+    if (direction === 'left' && hasFragmentStep) {
+      const target = { h: current.h, v: current.v, f: current.f - 1 };
+      debugLog('horizontalMethod:prevFragment', { from: current, to: target });
+      return ctx.deck.slide?.(target.h, target.v, target.f);
+    }
+
+    if (direction === 'right' && hasFragmentStep) {
+      const target = { h: current.h, v: current.v, f: current.f + 1 };
+      debugLog('horizontalMethod:nextFragment', { from: current, to: target });
+      return ctx.deck.slide?.(target.h, target.v, target.f);
+    }
+
+    if (hasHorizontalRoute) {
+      const target = { h: direction === 'left' ? current.h - 1 : current.h + 1, v: 0, f: -1 };
+      debugLog('horizontalMethod:slideHorizontal', { from: current, to: target });
+      return ctx.deck.slide?.(target.h, target.v, target.f);
+    }
+
+    debugLog('horizontalMethod:blocked', { methodName: direction, current, routes });
+    return undefined;
   }
 
   function isPastForwardBoundary(ctx, indices) {
@@ -248,13 +473,15 @@
     );
     const canMoveForwardWithinReleasedRegion = !!(
       studentBoundary
-      && (
-        current.h < studentBoundary.h
-        || (current.h === studentBoundary.h && current.v > 0)
-        || (current.h === studentBoundary.h && current.v === 0 && routes.hasDown)
-      )
+      && current.h < studentBoundary.h
     );
-    const allowForward = ctx.state.role === 'student'
+    const canProgressForwardHF = ctx.state.role === 'student'
+      ? (
+        canAdvanceToExactBoundary
+        || canMoveForwardWithinReleasedRegion
+      )
+      : false;
+    const allowForwardTraversal = ctx.state.role === 'student'
       ? (
         ctx.state.hasExplicitBoundary
         || roleCaps.canNavigateForward
@@ -265,15 +492,17 @@
     const hasBackwardFragment = hasBackwardFragmentStep(ctx.deck);
     const hasForwardFragment = hasForwardFragmentStep(ctx.deck);
 
-    // Treat Reveal prev/next as generic linear progression, which includes
-    // fragments and vertical stack movement. Keep left/right separate so
-    // horizontal controls can still honor horizontal boundaries exactly.
+    // Treat back as generic previous progression. Forward is split:
+    // `canGoForward` is semantic h.f progress toward the released instructor
+    // position, while `canGoDown` remains the local vertical-stack signal.
     let canGoBack = allowBackward && (routes.hasLeft || routes.hasUp || hasBackwardFragment);
-    let canGoForward = allowForward && (routes.hasRight || routes.hasDown || hasForwardFragment);
+    let canGoForward = ctx.state.role === 'student'
+      ? canProgressForwardHF
+      : (allowForwardTraversal && (routes.hasRight || routes.hasDown || hasForwardFragment));
     let canGoLeft = allowBackward && routes.hasLeft;
-    let canGoRight = allowForward && routes.hasRight;
+    let canGoRight = allowForwardTraversal && routes.hasRight;
     let canGoUp = allowBackward && routes.hasUp;
-    let canGoDown = allowForward && routes.hasDown;
+    let canGoDown = allowForwardTraversal && routes.hasDown;
 
     if (ctx.state.role === 'student' && studentBoundary) {
       const boundaryH = studentBoundary.h;
@@ -296,15 +525,14 @@
           canGoRight = false;
           canGoDown = false;
         } else if (current.h === boundaryH) {
+          canGoForward = false;
           canGoRight = false;
           canGoDown = canGoDown && routes.hasDown;
 
-          if (current.v > 0) {
-            canGoForward = canGoForward && (routes.hasDown || hasForwardFragment);
-          } else {
+          if (current.v === 0) {
             const canAdvanceTopFragments = hasForwardFragment
               && (!exactStudentBoundary || current.f < exactStudentBoundary.f);
-            canGoForward = canGoForward && (routes.hasDown || canAdvanceTopFragments);
+            canGoForward = canAdvanceTopFragments;
           }
         }
       }
@@ -314,14 +542,12 @@
         if (current.h > boundaryH) {
           canGoForward = false;
           canGoDown = false;
-        } else if (current.h === boundaryH && current.v === 0) {
-          canGoForward = canGoForward && routes.hasDown;
         }
       }
 
       if (exactStudentBoundary && current.h === exactStudentBoundary.h && current.v === 0) {
         if (current.f >= exactStudentBoundary.f) {
-          canGoForward = canGoForward && routes.hasDown;
+          canGoForward = false;
         }
       }
     }
@@ -344,35 +570,96 @@
 
     const nav = buildNavigationStatus(ctx);
     const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
+    debugLog('updateNavigationControls', {
+      role: ctx.state.role,
+      current: nav.current,
+      canGoLeft: nav.canGoLeft,
+      canGoRight: nav.canGoRight,
+      canGoUp: nav.canGoUp,
+      canGoDown: nav.canGoDown,
+      canGoBack: nav.canGoBack,
+      canGoForward: nav.canGoForward,
+      isUnrestricted,
+    });
 
     const applyArrowLocks = () => {
       const controls = document.querySelector('.reveal .controls');
       if (!controls) return;
 
       const isStudent = ctx.state.role === 'student';
-      const blockForward = isStudent && !nav.canGoRight;
-      const blockBack = isStudent && !nav.canGoLeft;
+      const allowRightShortcut = nav.canGoRight || (isStudent
+        ? canAdvanceRightWithinHF(ctx, nav)
+        : (nav.canGoForward && hasForwardFragmentStep(ctx.deck)));
+      const allowLeftShortcut = nav.canGoLeft || (isStudent
+        ? canRewindLeftWithinHF(ctx, nav)
+        : (nav.canGoBack && hasBackwardFragmentStep(ctx.deck)));
+      const blockForward = isStudent && !allowRightShortcut;
+      const blockBack = isStudent && !allowLeftShortcut;
+      const blockUp = isStudent && !nav.canGoUp;
+      const blockDown = isStudent && !nav.canGoDown;
+      const showRight = allowRightShortcut;
+      const showLeft = allowLeftShortcut;
+      const showUp = nav.canGoUp;
+      const showDown = nav.canGoDown;
 
-      // Only lock left/right (horizontal navigation tied to boundaries).
-      // Up/down (vertical nested slides) are independent and RevealJS handles visibility.
       const rightButton = controls.querySelector('.navigate-right');
       const leftButton = controls.querySelector('.navigate-left');
+      const upButton = controls.querySelector('.navigate-up');
+      const downButton = controls.querySelector('.navigate-down');
 
       if (rightButton) {
         rightButton.setAttribute('aria-disabled', blockForward ? 'true' : 'false');
-        rightButton.style.pointerEvents = blockForward ? 'none' : '';
+        rightButton.setAttribute('data-syncdeck-blocked', blockForward ? 'true' : 'false');
+        rightButton.setAttribute('data-syncdeck-visible', showRight ? 'true' : 'false');
+        rightButton.style.pointerEvents = blockForward || !showRight ? 'none' : '';
         rightButton.style.opacity = blockForward ? '0.18' : '';
+        rightButton.classList.toggle('disabled', blockForward);
+        rightButton.classList.toggle('enabled', !blockForward);
         if (blockForward) {
           rightButton.classList.remove('highlight');
+          rightButton.classList.remove('fragmented');
         }
       }
 
       if (leftButton) {
         leftButton.setAttribute('aria-disabled', blockBack ? 'true' : 'false');
-        leftButton.style.pointerEvents = blockBack ? 'none' : '';
+        leftButton.setAttribute('data-syncdeck-blocked', blockBack ? 'true' : 'false');
+        leftButton.setAttribute('data-syncdeck-visible', showLeft ? 'true' : 'false');
+        leftButton.style.pointerEvents = blockBack || !showLeft ? 'none' : '';
         leftButton.style.opacity = blockBack ? '0.18' : '';
+        leftButton.classList.toggle('disabled', blockBack);
+        leftButton.classList.toggle('enabled', !blockBack);
         if (blockBack) {
           leftButton.classList.remove('highlight');
+          leftButton.classList.remove('fragmented');
+        }
+      }
+
+      if (upButton) {
+        upButton.setAttribute('aria-disabled', blockUp ? 'true' : 'false');
+        upButton.setAttribute('data-syncdeck-blocked', blockUp ? 'true' : 'false');
+        upButton.setAttribute('data-syncdeck-visible', showUp ? 'true' : 'false');
+        upButton.style.pointerEvents = blockUp || !showUp ? 'none' : '';
+        upButton.style.opacity = blockUp ? '0.18' : '';
+        upButton.classList.toggle('disabled', blockUp);
+        upButton.classList.toggle('enabled', !blockUp);
+        if (blockUp) {
+          upButton.classList.remove('highlight');
+          upButton.classList.remove('fragmented');
+        }
+      }
+
+      if (downButton) {
+        downButton.setAttribute('aria-disabled', blockDown ? 'true' : 'false');
+        downButton.setAttribute('data-syncdeck-blocked', blockDown ? 'true' : 'false');
+        downButton.setAttribute('data-syncdeck-visible', showDown ? 'true' : 'false');
+        downButton.style.pointerEvents = blockDown || !showDown ? 'none' : '';
+        downButton.style.opacity = blockDown ? '0.18' : '';
+        downButton.classList.toggle('disabled', blockDown);
+        downButton.classList.toggle('enabled', !blockDown);
+        if (blockDown) {
+          downButton.classList.remove('highlight');
+          downButton.classList.remove('fragmented');
         }
       }
     };
@@ -380,7 +667,7 @@
     // For instructors and standalone mode, enable all navigation.
     if (isUnrestricted) {
       ctx.deck.configure({
-        keyboard: true,
+        keyboard: false,
         touch: true,
       });
       applyArrowLocks();
@@ -395,6 +682,9 @@
     if (nav.canGoLeft) {
       keyboardMap[37] = 'left';   // left arrow
       keyboardMap[72] = 'left';   // h
+    } else if (nav.canGoBack && hasBackwardFragmentStep(ctx.deck)) {
+      keyboardMap[37] = 'prev';   // left arrow falls back to fragment/back progression
+      keyboardMap[72] = 'prev';   // h
     }
 
     if (nav.canGoBack) {
@@ -404,6 +694,9 @@
     if (nav.canGoRight) {
       keyboardMap[39] = 'right';  // right arrow
       keyboardMap[76] = 'right';  // l
+    } else if (nav.canGoForward && hasForwardFragmentStep(ctx.deck)) {
+      keyboardMap[39] = 'next';   // right arrow falls back to fragment/forward progression
+      keyboardMap[76] = 'next';   // l
     }
 
     if (nav.canGoForward) {
@@ -412,11 +705,11 @@
     }
 
     if (nav.canGoUp) {
-      keyboardMap[38] = 'up';     // up arrow (for vertical slides)
+      keyboardMap[38] = () => ctx.deck.up?.();     // up arrow stays purely vertical
     }
 
     if (nav.canGoDown) {
-      keyboardMap[40] = 'down';   // down arrow (for vertical slides)
+      keyboardMap[40] = () => ctx.deck.down?.();   // down arrow stays purely vertical
     }
 
     // Allow ESC but not for overview (map to 'null' to disable default ESC behavior).
@@ -427,7 +720,7 @@
 
     ctx.deck.configure({
       // Enable keyboard only with the specific keys we've mapped.
-      keyboard: Object.keys(keyboardMap).length > 0 ? keyboardMap : false,
+      keyboard: false,
 
       // Enable touch if any horizontal or vertical navigation is permitted.
       touch: nav.canGoBack || nav.canGoForward || nav.canGoUp || nav.canGoDown,
@@ -614,6 +907,14 @@
       if (typeof original !== 'function') return;
 
       ctx.deck[methodName] = function wrappedStudentNavigationMethod(...args) {
+        if (!ctx.state.applyingRemote && (methodName === 'up' || methodName === 'down')) {
+          return moveVertical(ctx, methodName);
+        }
+
+        if (!ctx.state.applyingRemote && (methodName === 'left' || methodName === 'right')) {
+          return moveHorizontal(ctx, methodName);
+        }
+
         if (!ctx.state.applyingRemote && ctx.state.role === 'student') {
           const nav = buildNavigationStatus(ctx);
           if (!predicate(nav)) {
@@ -682,6 +983,59 @@
 
     ctx.state.exactStudentMaxIndices = nextExactBoundary;
     return true;
+  }
+
+  function syncExactBoundaryFromIndices(ctx, indices) {
+    if (ctx.state.role !== 'student') return false;
+    if (!ctx.state.studentMaxIndices) return false;
+
+    const boundary = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
+    const nextExactBoundary = normalizeIndices(indices);
+    if (nextExactBoundary.h !== boundary.h || nextExactBoundary.v !== 0) return false;
+
+    const previousExactBoundary = ctx.state.exactStudentMaxIndices
+      ? normalizeIndices(ctx.state.exactStudentMaxIndices)
+      : null;
+
+    if (previousExactBoundary && compareIndices(previousExactBoundary, nextExactBoundary) === 0) {
+      return false;
+    }
+
+    ctx.state.exactStudentMaxIndices = nextExactBoundary;
+    return true;
+  }
+
+  function stateIndicesFromPayload(state) {
+    return normalizeIndices({
+      h: state?.indexh ?? state?.indices?.h ?? 0,
+      v: state?.indexv ?? state?.indices?.v ?? 0,
+      f: state?.indexf ?? state?.indices?.f ?? -1,
+    });
+  }
+
+  function resolveStudentSyncedState(ctx, state) {
+    const incoming = stateIndicesFromPayload(state);
+
+    if (ctx.state.role !== 'student') {
+      return { applied: incoming, syncedBoundary: incoming };
+    }
+
+    const current = normalizeIndices(ctx.deck.getIndices());
+    const preserveLocalStackPosition = current.h === incoming.h
+      && topLevelSlideHasVerticalChildren(incoming.h)
+      && (current.v > 0 || incoming.v > 0);
+    if (incoming.v === 0) {
+      clearSuppressedFutureFragments();
+      rememberTopSlideFragment(ctx, incoming);
+    }
+    const applied = preserveLocalStackPosition
+      ? { h: incoming.h, v: current.v, f: current.f }
+      : incoming;
+
+    return {
+      applied,
+      syncedBoundary: incoming,
+    };
   }
 
   /** Default boundary for a student before the instructor has progressed. */
@@ -884,7 +1238,14 @@
             // should never be activated on the receiving end. Instead, route the
             // overview flag to the custom bottom-of-screen storyboard strip.
             const { overview, ...safeState } = payload.state;
-            deck.setState(safeState);
+            const resolvedState = resolveStudentSyncedState(ctx, safeState);
+            deck.setState({
+              ...safeState,
+              indexh: resolvedState.applied.h,
+              indexv: resolvedState.applied.v,
+              indexf: resolvedState.applied.f,
+            });
+            payload.__resolvedSyncBoundary = resolvedState.syncedBoundary;
             if (overview !== undefined) {
               window.dispatchEvent(new CustomEvent('reveal-storyboard-set', { detail: { open: !!overview } }));
             }
@@ -941,6 +1302,7 @@
               ctx.state.boundaryIsLocal = false;
               ctx.state.exactStudentMaxIndices = null;
               ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+              ctx.state.topSlideFragmentsByH = {};
               ctx.state.releaseStartH = null;
               ctx.state.releaseEndH = null;
               // Prevent student from drawing on the chalkboard canvas.
@@ -1038,7 +1400,14 @@
         emitLocalStatusEvent(ctx, 'captureStudentBoundary');
       }
 
-      if (ctx.state.role === 'student' && ctx.state.studentMaxIndices && syncExactBoundaryFragmentLock(ctx)) {
+      const syncedBoundaryIndices = command.name === 'setState'
+        ? payload.__resolvedSyncBoundary
+        : null;
+      const exactBoundaryChanged = syncedBoundaryIndices
+        ? syncExactBoundaryFromIndices(ctx, syncedBoundaryIndices)
+        : syncExactBoundaryFragmentLock(ctx);
+
+      if (ctx.state.role === 'student' && ctx.state.studentMaxIndices && exactBoundaryChanged) {
         updateNavigationControls(ctx);
         emitLocalStatusEvent(ctx, 'syncExactBoundaryFragmentLock');
       }
@@ -1061,6 +1430,7 @@
 
   function wireDeckEvents(ctx) {
     const deck = ctx.deck;
+    const controls = document.querySelector('.reveal .controls');
 
     const enforceStudentBounds = () => {
       enforceStudentNavigationBoundary(ctx);
@@ -1114,6 +1484,118 @@
     deck.on('slidechanged', flushChalkboardState);
     deck.on('fragmentshown', emitState);
     deck.on('fragmenthidden', emitState);
+
+    if (controls) {
+      ['.navigate-left', '.navigate-right', '.navigate-up', '.navigate-down'].forEach((selector) => {
+        const button = controls.querySelector(selector);
+        if (!button) return;
+        const replacement = button.cloneNode(true);
+        button.replaceWith(replacement);
+      });
+
+      const currentControls = document.querySelector('.reveal .controls');
+      if (!currentControls) return;
+
+      const handleDirectionalControl = (button) => {
+        debugLog('control:activate', {
+          role: ctx.state.role,
+          button: button.className,
+          current: normalizeIndices(ctx.deck.getIndices()),
+          activeElement: describeElement(document.activeElement),
+        });
+        if (button.matches('.navigate-left')) {
+          ctx.deck.left?.();
+        } else if (button.matches('.navigate-right')) {
+          ctx.deck.right?.();
+        } else if (button.matches('.navigate-up')) {
+          ctx.deck.up?.();
+        } else if (button.matches('.navigate-down')) {
+          ctx.deck.down?.();
+        }
+      };
+
+      const interceptControlPress = (event) => {
+        const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
+        if (!button) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+      };
+
+      const interceptControlClick = (event) => {
+        const button = event.target?.closest?.('.navigate-left, .navigate-right, .navigate-up, .navigate-down');
+        if (!button) return;
+        interceptControlPress(event);
+        handleDirectionalControl(button);
+      };
+
+      currentControls.addEventListener('pointerdown', interceptControlPress, true);
+      currentControls.addEventListener('mousedown', interceptControlPress, true);
+      currentControls.addEventListener('touchstart', interceptControlPress, true);
+      currentControls.addEventListener('click', interceptControlClick, true);
+      ctx.cleanup.push(() => {
+        currentControls.removeEventListener('pointerdown', interceptControlPress, true);
+        currentControls.removeEventListener('mousedown', interceptControlPress, true);
+        currentControls.removeEventListener('touchstart', interceptControlPress, true);
+        currentControls.removeEventListener('click', interceptControlClick, true);
+      });
+    }
+
+    const interceptDirectionalKeyboard = (event) => {
+      debugLog('raw-keydown', {
+        key: event.key,
+        defaultPrevented: event.defaultPrevented,
+        target: describeElement(event.target),
+        activeElement: describeElement(document.activeElement),
+      });
+        if (event.defaultPrevented) return;
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const isVerticalKey = event.key === 'ArrowUp' || event.key === 'ArrowDown';
+        const isHorizontalKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+      if (!isVerticalKey && !isHorizontalKey) return;
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement
+        && (target.isContentEditable
+          || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName))
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+
+        debugLog('keyboard:intercept', {
+          role: ctx.state.role,
+          key: event.key,
+          current: normalizeIndices(ctx.deck.getIndices()),
+          activeElement: describeElement(document.activeElement),
+        });
+
+        if (event.key === 'ArrowUp') {
+          ctx.deck.up?.();
+      } else if (event.key === 'ArrowDown') {
+        ctx.deck.down?.();
+      } else if (event.key === 'ArrowLeft') {
+        ctx.deck.left?.();
+      } else if (event.key === 'ArrowRight') {
+        ctx.deck.right?.();
+      }
+    };
+
+    window.addEventListener('keydown', interceptDirectionalKeyboard, true);
+    document.addEventListener('keydown', interceptDirectionalKeyboard, true);
+    ctx.cleanup.push(() => {
+      window.removeEventListener('keydown', interceptDirectionalKeyboard, true);
+      document.removeEventListener('keydown', interceptDirectionalKeyboard, true);
+    });
     deck.on('paused', emitState);
     deck.on('resumed', emitState);
     deck.on('resumed', enforcePauseLock);
@@ -1259,11 +1741,18 @@
         boundaryIsLocal: false,      // true when boundary was set by storyboard button (acting instructor)
         exactStudentMaxIndices: null,
         lastAllowedStudentIndices: titleSlideBoundary(),
+        topSlideFragmentsByH: {},
         touchGesture: null,
         releaseStartH: null,
         releaseEndH: null,
       },
     };
+
+    debugLog('init', {
+      role: ctx.state.role,
+      deckId: config.deckId || null,
+      hostOrigin: config.hostOrigin,
+    });
 
     wireDeckEvents(ctx);
     wireWindowMessageListener(ctx);
@@ -1290,6 +1779,7 @@
             ctx.state.boundaryIsLocal = false;
             ctx.state.exactStudentMaxIndices = null;
             ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+            ctx.state.topSlideFragmentsByH = {};
             ctx.state.releaseStartH = null;
             ctx.state.releaseEndH = null;
           }
