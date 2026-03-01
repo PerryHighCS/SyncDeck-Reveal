@@ -666,7 +666,9 @@
     // For instructors and standalone mode, enable all navigation.
     if (isUnrestricted) {
       ctx.deck.configure({
-        keyboard: false,
+        // Keep Reveal's built-in keyboard shortcuts for unrestricted roles.
+        // Arrow keys are still intercepted by the runtime in capture phase.
+        keyboard: true,
         touch: true,
       });
       applyArrowLocks();
@@ -1536,7 +1538,7 @@
       if (
         target instanceof HTMLElement
         && (target.isContentEditable
-          || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName))
+          || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
       ) {
         return;
       }
