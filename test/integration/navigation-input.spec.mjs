@@ -89,6 +89,74 @@ test('student follow-instructor mode auto-captures boundary from synced state af
   expect(status.navigation.canGoDown).toBe(false);
 });
 
+test('student follow-instructor mode exact-locks flat boundary slides before and after the first fragment', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.navigation.canGoForward === false;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.studentBoundary).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.canGoForward).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoForward === false;
+  });
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.studentBoundary).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 2, v: 0, f: 0 });
+  expect(status.navigation.canGoForward).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+});
+
 test('student direct API bypass snaps back to explicit boundary and exact pullback lock', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

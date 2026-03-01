@@ -912,6 +912,7 @@
       // effect.  An explicit grant should not be silently overwritten by a sync.
       if (shouldCaptureStudentBoundary && ctx.state.role === 'student' && !ctx.state.hasExplicitBoundary) {
         captureStudentBoundary(ctx);
+        updateNavigationControls(ctx);
         emitLocalStatusEvent(ctx, 'captureStudentBoundary');
       }
 
