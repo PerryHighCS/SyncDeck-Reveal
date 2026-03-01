@@ -502,7 +502,9 @@
     let canGoLeft = allowBackward && routes.hasLeft;
     let canGoRight = allowForwardTraversal && routes.hasRight;
     let canGoUp = allowBackward && routes.hasUp;
-    let canGoDown = allowForwardTraversal && routes.hasDown;
+    let canGoDown = ctx.state.role === 'student'
+      ? routes.hasDown
+      : (allowForwardTraversal && routes.hasDown);
 
     if (ctx.state.role === 'student' && studentBoundary) {
       const boundaryH = studentBoundary.h;
@@ -527,7 +529,7 @@
         } else if (current.h === boundaryH) {
           canGoForward = false;
           canGoRight = false;
-          canGoDown = canGoDown && routes.hasDown;
+          canGoDown = routes.hasDown;
 
           if (current.v === 0) {
             const canAdvanceTopFragments = hasForwardFragment
@@ -895,7 +897,7 @@
   function wrapStudentNavigationMethods(ctx) {
     const guardedMethods = [
       ['prev', (nav) => nav.canGoBack],
-      ['next', (nav) => nav.canGoForward],
+      ['next', (nav) => nav.canGoForward || nav.canGoDown],
       ['left', (nav) => nav.canGoLeft],
       ['right', (nav) => nav.canGoRight],
       ['up', (nav) => nav.canGoUp],

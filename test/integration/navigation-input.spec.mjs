@@ -328,7 +328,8 @@ test('student keeps local stack position when instructor moves within the same r
     return status.indices.h === 1
       && status.indices.v === 0
       && status.indices.f === -1
-      && status.navigation.canGoForward === true;
+      && status.navigation.canGoForward === true
+      && status.navigation.canGoDown === true;
   });
 
   await page.evaluate(() => {
@@ -564,7 +565,8 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
   let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
-  expect(status.navigation.canGoForward).toBe(true);
+  expect(status.navigation.canGoForward).toBe(false);
+  expect(status.navigation.canGoDown).toBe(true);
 
   await page.evaluate(() => {
     window.Reveal.next();

@@ -57,7 +57,7 @@ test('student explicit boundary updates status, navigation, and released storybo
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
   expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
   expect(status.navigation.canGoRight).toBe(false);
-  expect(status.navigation.canGoForward).toBe(true);
+  expect(status.navigation.canGoForward).toBe(false);
   expect(status.navigation.canGoDown).toBe(true);
 
   const storyboardState = await page.evaluate(() => Array.from(document.querySelectorAll('#storyboard-track .story-thumb-wrap')).map((wrap) => ({
