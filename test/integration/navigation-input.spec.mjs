@@ -147,6 +147,104 @@ test('student follow-instructor mode auto-captures boundary from synced state af
   expect(status.navigation.canGoDown).toBe(false);
 });
 
+test('student follow-instructor mode keeps pulling forward on subsequent synced state updates', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.studentBoundary?.h === 1;
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.studentBoundary?.h === 2
+      && status.releasedRegion?.startH === 2
+      && status.releasedRegion?.endH === 2;
+  });
+
+  const status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.studentBoundary).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.releasedRegion).toEqual({ startH: 2, endH: 2 });
+  expect(status.navigation.maxIndices).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.canGoRight).toBe(false);
+});
+
+test('student follow-instructor mode keeps pulling on next and prev commands after moving backward', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 0, indexv: 0, indexf: -1 },
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 0
+      && status.indices.v === 0
+      && status.studentBoundary?.h === 0;
+  });
+
+  await sendCommand(page, 'next');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.studentBoundary?.h === 1;
+  });
+
+  await sendCommand(page, 'prev');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 0
+      && status.indices.v === 0
+      && status.studentBoundary?.h === 0;
+  });
+
+  await sendCommand(page, 'next');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.studentBoundary?.h === 1;
+  });
+
+  const status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
+});
+
 test('follow mode with studentCanNavigateForward enabled does not exact-lock the top boundary slide', async ({ page }) => {
   await configureHarness(page, {
     revealOptions: {

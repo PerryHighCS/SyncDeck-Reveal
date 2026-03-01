@@ -1040,8 +1040,8 @@
     });
   }
 
-  function captureStudentBoundary(ctx) {
-    const current = normalizeIndices(ctx.deck.getIndices());
+  function captureStudentBoundary(ctx, indices) {
+    const current = normalizeIndices(indices ?? ctx.deck.getIndices());
     const boundary = normalizeBoundaryIndices(current);
     ctx.state.studentMaxIndices = boundary;
     // In follow-instructor mode with forward navigation disabled, the captured
@@ -1336,6 +1336,11 @@
     } finally {
       queueMicrotask(() => {
         ctx.state.applyingRemote = false;
+        if (ctx.state.pendingRemoteBoundaryCapture) {
+          requestAnimationFrame(() => {
+            flushPendingRemoteBoundaryCapture(ctx);
+          });
+        }
       });
     }
   }
@@ -1368,6 +1373,7 @@
     const payload = command.payload || {};
     let shouldCaptureStudentBoundary = false;
     let boundaryCaptureReason = 'captureStudentBoundary';
+    let boundaryCaptureTarget = null;
 
     if (!deck) return;
 
@@ -1385,10 +1391,12 @@
         case 'slide':
           deck.slide(payload.h ?? 0, payload.v ?? 0, payload.f);
           shouldCaptureStudentBoundary = true;
+          boundaryCaptureTarget = normalizeIndices({ h: payload.h ?? 0, v: payload.v ?? 0, f: payload.f });
           break;
         case 'setState':
           payload.__resolvedSyncBoundary = applySyncedState(ctx, payload)?.syncedBoundary || null;
           shouldCaptureStudentBoundary = true;
+          boundaryCaptureTarget = payload.__resolvedSyncBoundary;
           break;
         case 'syncToInstructor':
           if (ctx.state.role === 'student') {
@@ -1397,6 +1405,7 @@
           payload.__resolvedSyncBoundary = applySyncedState(ctx, payload)?.syncedBoundary || null;
           shouldCaptureStudentBoundary = true;
           boundaryCaptureReason = 'syncToInstructor';
+          boundaryCaptureTarget = payload.__resolvedSyncBoundary;
           break;
 
         // overview commands → custom storyboard strip (not Reveal's built-in grid).
@@ -1539,12 +1548,12 @@
       // explicit boundary (allowStudentForwardTo / setStudentBoundary) is in
       // effect.  An explicit grant should not be silently overwritten by a sync.
       if (shouldCaptureStudentBoundary && ctx.state.role === 'student' && !ctx.state.hasExplicitBoundary) {
-        captureStudentBoundary(ctx);
+        captureStudentBoundary(ctx, boundaryCaptureTarget || ctx.deck.getIndices());
         updateNavigationControls(ctx);
         emitLocalStatusEvent(ctx, boundaryCaptureReason);
       }
 
-      const syncedBoundaryIndices = command.name === 'setState'
+      const syncedBoundaryIndices = (command.name === 'setState' || command.name === 'syncToInstructor')
         ? payload.__resolvedSyncBoundary
         : null;
       const exactBoundaryChanged = syncedBoundaryIndices
