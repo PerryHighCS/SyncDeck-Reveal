@@ -16,10 +16,29 @@ function contentTypeFor(filePath) {
 }
 
 export async function startStaticServer(rootDir) {
+  const rootPath = path.resolve(rootDir);
+
   const server = http.createServer(async (req, res) => {
     const reqPath = new URL(req.url, 'http://127.0.0.1').pathname;
-    const relativePath = decodeURIComponent(reqPath.replace(/^\/+/, ''));
-    const filePath = path.join(rootDir, relativePath);
+    let relativePath;
+
+    try {
+      relativePath = decodeURIComponent(reqPath.replace(/^\/+/, ''));
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Bad request');
+      return;
+    }
+
+    const filePath = path.resolve(rootPath, relativePath);
+    const relativeFromRoot = path.relative(rootPath, filePath);
+    const escapedRoot = relativeFromRoot === '..' || relativeFromRoot.startsWith(`..${path.sep}`);
+
+    if (escapedRoot || path.isAbsolute(relativeFromRoot)) {
+      res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Forbidden');
+      return;
+    }
 
     try {
       const contents = await readFile(filePath);

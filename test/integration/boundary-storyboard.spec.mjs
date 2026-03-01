@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { expect, test } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirname, '../fixtures/runtime-harness.html');
-const fixtureUrl = new URL(`file://${fixturePath}`);
+const fixtureUrl = pathToFileURL(fixturePath);
 
 async function sendCommand(page, name, payload = {}) {
   await page.evaluate(

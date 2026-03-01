@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { expect, test } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirname, '../fixtures/runtime-harness.html');
-const fixtureUrl = new URL(`file://${fixturePath}`);
+const fixtureUrl = pathToFileURL(fixturePath);
 
 test('loads the iframe sync and storyboard runtimes into a fixture deck', async ({ page }) => {
   await page.goto(fixtureUrl.toString());

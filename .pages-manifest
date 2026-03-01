@@ -4,6 +4,9 @@ exclude test/
 exclude coverage/
 exclude node_modules/
 exclude playwright-report/
+exclude .github/
+exclude .gitignore
+exclude eslint.config.mjs
 exclude package.json
 exclude package-lock.json
 exclude vitest.config.js

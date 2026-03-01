@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { expect, test } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirname, '../fixtures/runtime-harness.html');
-const fixtureUrl = new URL(`file://${fixturePath}`);
+const fixtureUrl = pathToFileURL(fixturePath);
 
 async function configureHarness(page, config) {
   await page.addInitScript((value) => {
@@ -217,7 +217,13 @@ test('same-h fragment pullback exact-locks to the requested fragment and clears 
     window.Reveal.next();
   });
 
-  await page.waitForTimeout(50);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.navigation.canGoForward === false;
+  });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
@@ -302,7 +308,14 @@ test('same-h vertical pullback exact-locks to the requested stack child', async 
     window.Reveal.next();
   });
 
-  await page.waitForTimeout(50);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.navigation.canGoDown === false
+      && status.navigation.canGoForward === false;
+  });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
@@ -410,7 +423,13 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
     window.Reveal.prev();
   });
 
-  await page.waitForTimeout(50);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0
+      && status.navigation.canGoBack === false;
+  });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.navigation.current).toEqual({ h: 1, v: 0, f: 0 });
@@ -434,7 +453,14 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
     window.Reveal.prev();
   });
 
-  await page.waitForTimeout(50);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.navigation.canGoUp === false
+      && status.navigation.canGoBack === false;
+  });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
@@ -568,7 +594,12 @@ test('student touch swipe uses fragments within the boundary and blocks horizont
 
   swipe = await swipeLeft();
 
-  await page.waitForTimeout(50);
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
 
   const status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.indices).toEqual({ h: 1, v: 0, f: 0 });
