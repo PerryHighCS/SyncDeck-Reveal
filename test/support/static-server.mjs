@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 const MIME_TYPES = {
@@ -17,6 +17,7 @@ function contentTypeFor(filePath) {
 
 export async function startStaticServer(rootDir) {
   const rootPath = path.resolve(rootDir);
+  const resolvedRootPath = await realpath(rootPath);
 
   const server = http.createServer(async (req, res) => {
     const method = req.method || 'GET';
@@ -51,19 +52,30 @@ export async function startStaticServer(rootDir) {
     }
 
     try {
+      const resolvedFilePath = await realpath(filePath);
+      const relativeFromResolvedRoot = path.relative(resolvedRootPath, resolvedFilePath);
+      const escapedResolvedRoot = relativeFromResolvedRoot === '..'
+        || relativeFromResolvedRoot.startsWith(`..${path.sep}`);
+
+      if (escapedResolvedRoot || path.isAbsolute(relativeFromResolvedRoot)) {
+        res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+        res.end('Forbidden');
+        return;
+      }
+
       if (method === 'HEAD') {
-        const info = await stat(filePath);
+        const info = await stat(resolvedFilePath);
         if (!info.isFile()) throw new Error('Not a file');
         res.writeHead(200, {
-          'content-type': contentTypeFor(filePath),
+          'content-type': contentTypeFor(resolvedFilePath),
           'content-length': String(info.size),
         });
         res.end();
         return;
       }
 
-      const contents = await readFile(filePath);
-      res.writeHead(200, { 'content-type': contentTypeFor(filePath) });
+      const contents = await readFile(resolvedFilePath);
+      res.writeHead(200, { 'content-type': contentTypeFor(resolvedFilePath) });
       res.end(contents);
     } catch {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
