@@ -243,6 +243,61 @@ test('same-h fragment pullback exact-locks to the requested fragment and clears 
   expect(status.navigation.canGoForward).toBe(true);
 });
 
+test('explicit boundary exact-locks a flat slide to the instructor fragment position', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 2, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2 && status.indices.v === 0 && status.indices.f === -1;
+  });
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.maxIndices).toEqual({ h: 2, v: 0, f: -1 });
+  expect(status.navigation.canGoForward).toBe(false);
+  expect(status.navigation.canGoRight).toBe(false);
+
+  await page.evaluate(() => {
+    window.Reveal.next();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.navigation.canGoForward === false;
+  });
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 2, v: 0, f: -1 });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 2, v: 0, f: 0 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2 && status.indices.v === 0 && status.indices.f === 0;
+  });
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 2, v: 0, f: 0 });
+  expect(status.navigation.canGoForward).toBe(false);
+});
+
 test('same-h vertical pullback exact-locks to the requested stack child', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

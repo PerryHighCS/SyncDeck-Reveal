@@ -162,6 +162,13 @@
     return current.f > -1;
   }
 
+  function topLevelSlideHasVerticalChildren(deck, hIndex) {
+    const topLevelSlides = Array.from(document.querySelectorAll('.reveal .slides > section'));
+    const targetSlide = topLevelSlides[Math.max(0, Math.min(topLevelSlides.length - 1, Number(hIndex) || 0))];
+    if (!targetSlide) return false;
+    return Array.from(targetSlide.children).some((node) => node.tagName === 'SECTION');
+  }
+
   function buildReleasedRegion(ctx) {
     // releaseStartH/releaseEndH stay null until a boundary is captured or
     // explicitly applied. Only emit a released region when the iframe is
@@ -565,6 +572,7 @@
     const requestedBoundary = normalizeIndices(indices);
     const nextBoundary = normalizeBoundaryIndices(requestedBoundary);
     const current = normalizeIndices(ctx.deck.getIndices());
+    const boundaryHasVerticalChildren = topLevelSlideHasVerticalChildren(ctx.deck, nextBoundary.h);
     ctx.state.studentMaxIndices = nextBoundary;
     ctx.state.hasExplicitBoundary = true;
     const releaseStartH = Number.isFinite(Number(options.releaseStartH))
@@ -585,9 +593,12 @@
     // stack / fragment sequence). Normal boundary storage and steady-state
     // navigation enforcement remain horizontal-only via nextBoundary.
     const isPastRequestedBoundary = compareIndices(current, requestedBoundary) > 0;
+    const shouldHoldFlatBoundaryExactly = !options.localBoundary
+      && ctx.state.role === 'student'
+      && !boundaryHasVerticalChildren;
     const shouldExactLock = !options.localBoundary
       && ctx.state.role === 'student'
-      && isPastRequestedBoundary;
+      && (isPastRequestedBoundary || shouldHoldFlatBoundaryExactly);
     ctx.state.exactStudentMaxIndices = shouldExactLock ? requestedBoundary : null;
     const snapTarget = shouldExactLock ? requestedBoundary : nextBoundary;
     let lastAllowedTarget = current;

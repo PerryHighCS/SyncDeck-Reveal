@@ -780,15 +780,17 @@ body.storyboard-open > .reveal {
             <h3>Action</h3>
             <ol class="checklist">
               <li>Release the student to this slide only.</li>
-              <li>Advance the student until the boundary is this slide and the fragment rail below is still available.</li>
-              <li>Try advancing locally on the student view.</li>
-              <li>After the final fragment, try advancing one more time past the horizontal boundary.</li>
+              <li>Place the instructor on this slide before any fragment is revealed.</li>
+              <li>Try advancing locally on the student view before the instructor reveals Fragment A.</li>
+              <li>Reveal Fragment A from the instructor side, then try advancing locally again from the student view.</li>
+              <li>After the final instructor-released fragment, try advancing one more time past the horizontal boundary.</li>
             </ol>
           </div>
           <div class="panel">
             <h3>Expected</h3>
             <ul class="checklist expected-list">
-              <li>The student can advance through fragments on this slide.</li>
+              <li>Before the instructor reveals Fragment A, the student stays locked at the start of this slide.</li>
+              <li>After the instructor reveals a fragment, the student is still locked to that current instructor fragment position.</li>
               <li>The student cannot move to the next horizontal slide once the fragments are exhausted.</li>
               <li>No flash onto the next slide should be visible before snap-back.</li>
             </ul>
@@ -802,7 +804,7 @@ body.storyboard-open > .reveal {
                   <span class="fragment-pill fragment">Fragment C: boundary should still hold</span>
                 </div>
               </div>
-              <div class="callout">If the student can move from this slide to the next horizontal slide without a new boundary grant, treat that as a failure.</div>
+              <div class="callout">If the student can reveal additional local fragments or move to the next horizontal slide without a new instructor release, treat that as a failure.</div>
             </div>
           </div>
         </div>
