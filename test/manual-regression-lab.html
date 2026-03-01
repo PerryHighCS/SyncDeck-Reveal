@@ -89,6 +89,7 @@ body,
   --gap: 24px;
   --gap-sm: 14px;
   --gap-lg: 36px;
+  --storyboard-open-offset: 176px;
 }
 
 *, *::before, *::after {
@@ -654,11 +655,11 @@ body::before {
 
 body.storyboard-open .storyboard {
   transform: translateY(0);
-  min-height: 176px;
+  min-height: var(--storyboard-open-offset);
 }
 
 body.storyboard-open > .reveal {
-  transform: translateY(-176px);
+  transform: translateY(calc(-1 * var(--storyboard-open-offset)));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1208,6 +1209,32 @@ if (window.initRevealStoryboard) {
     toggleKey: 'm',
   });
 }
+
+const storyboard = document.getElementById('storyboard');
+const storyboardTrack = document.getElementById('storyboard-track');
+
+function syncStoryboardOffset() {
+  if (!storyboard) return;
+  const height = Math.ceil(storyboard.getBoundingClientRect().height);
+  if (height > 0) {
+    document.documentElement.style.setProperty('--storyboard-open-offset', `${height}px`);
+  }
+}
+
+syncStoryboardOffset();
+
+if (typeof ResizeObserver === 'function') {
+  const storyboardResizeObserver = new ResizeObserver(() => {
+    syncStoryboardOffset();
+  });
+  storyboardResizeObserver.observe(storyboard);
+  if (storyboardTrack) storyboardResizeObserver.observe(storyboardTrack);
+}
+
+window.addEventListener('resize', syncStoryboardOffset);
+window.addEventListener('reveal-storyboard-changed', syncStoryboardOffset);
+window.addEventListener('reveal-iframesync-status', syncStoryboardOffset);
+window.addEventListener('reveal-storyboard-boundary-update', syncStoryboardOffset);
 </script>
 </body>
 </html>

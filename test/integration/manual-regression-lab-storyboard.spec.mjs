@@ -69,21 +69,21 @@ test.describe('manual regression lab storyboard thumbnails', () => {
   });
 
   test('renders fixed-size storyboard thumbnails for the manual lab deck', async ({ page }) => {
-    await page.route('https://unpkg.com/reveal.js@5.1.0/dist/reveal.js', async (route) => {
+    await page.route('https://unpkg.com/reveal.js@*/dist/reveal.js', async (route) => {
       await route.fulfill({
         contentType: 'text/javascript; charset=utf-8',
         body: revealScript,
       });
     });
 
-    await page.route('https://unpkg.com/reveal.js@5.1.0/dist/reveal.css', async (route) => {
+    await page.route('https://unpkg.com/reveal.js@*/dist/reveal.css', async (route) => {
       await route.fulfill({
         contentType: 'text/css; charset=utf-8',
         body: revealCss,
       });
     });
 
-    await page.route('https://unpkg.com/reveal.js@5.1.0/plugin/notes/notes.js', async (route) => {
+    await page.route('https://unpkg.com/reveal.js@*/plugin/notes/notes.js', async (route) => {
       await route.fulfill({
         contentType: 'text/javascript; charset=utf-8',
         body: 'window.RevealNotes = { id: "RevealNotes", init() {} };',
@@ -128,6 +128,8 @@ test.describe('manual regression lab storyboard thumbnails', () => {
       const thumbRect = thumb?.getBoundingClientRect();
       const previewRect = preview?.getBoundingClientRect();
       const storyboardRect = document.getElementById('storyboard')?.getBoundingClientRect();
+      const reveal = document.querySelector('body > .reveal');
+      const revealTransform = reveal ? getComputedStyle(reveal).transform : '';
 
       return {
         thumbCount: document.querySelectorAll('#storyboard-track .story-thumb').length,
@@ -140,8 +142,12 @@ test.describe('manual regression lab storyboard thumbnails', () => {
         previewOverflow: preview ? getComputedStyle(preview).overflow : '',
         sceneTransform: scene ? getComputedStyle(scene).transform : '',
         sceneScaleX: scene ? new DOMMatrixReadOnly(getComputedStyle(scene).transform).a : 0,
+        revealTranslateY: revealTransform && revealTransform !== 'none'
+          ? new DOMMatrixReadOnly(revealTransform).m42
+          : 0,
         captionText: caption?.textContent?.trim() ?? '',
         storyboardHeight: storyboardRect?.height ?? 0,
+        openOffsetVar: getComputedStyle(document.documentElement).getPropertyValue('--storyboard-open-offset').trim(),
       };
     });
 
@@ -161,5 +167,8 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     expect(metrics.sceneScaleX).toBeLessThan(0.13);
     expect(metrics.captionText.length).toBeGreaterThan(0);
     expect(metrics.storyboardHeight).toBeGreaterThan(170);
+    expect(metrics.openOffsetVar).toBe(`${Math.ceil(metrics.storyboardHeight)}px`);
+    expect(Math.abs(metrics.revealTranslateY)).toBeGreaterThanOrEqual(Math.floor(metrics.storyboardHeight));
+    expect(Math.abs(metrics.revealTranslateY)).toBeLessThanOrEqual(Math.ceil(metrics.storyboardHeight) + 1);
   });
 });
