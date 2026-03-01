@@ -41,7 +41,7 @@ test('student explicit boundary updates status, navigation, and released storybo
     const wraps = Array.from(document.querySelectorAll('#storyboard-track .story-thumb-wrap'));
     const locked = document.querySelectorAll('#storyboard-track .story-thumb-locked').length;
     return status.studentBoundary?.h === 1
-      && status.indices.h === 1
+      && status.indices.h === 0
       && wraps.length === 2
       && locked === 1
       && wraps[0]?.classList.contains('story-thumb-released')
@@ -54,11 +54,11 @@ test('student explicit boundary updates status, navigation, and released storybo
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
   expect(status.releasedRegion).toEqual({ startH: 0, endH: 1 });
-  expect(status.navigation.current).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.current).toEqual({ h: 0, v: 0, f: -1 });
   expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
-  expect(status.navigation.canGoRight).toBe(false);
-  expect(status.navigation.canGoForward).toBe(false);
-  expect(status.navigation.canGoDown).toBe(true);
+  expect(status.navigation.canGoRight).toBe(true);
+  expect(status.navigation.canGoForward).toBe(true);
+  expect(status.navigation.canGoDown).toBe(false);
 
   const storyboardState = await page.evaluate(() => Array.from(document.querySelectorAll('#storyboard-track .story-thumb-wrap')).map((wrap) => ({
     slide: wrap.getAttribute('data-slide'),

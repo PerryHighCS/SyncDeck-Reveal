@@ -528,6 +528,14 @@ test('student keeps local lower stack child when instructor moves down and back 
     syncToBoundary: true,
   });
 
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
@@ -570,6 +578,27 @@ test('student keeps local lower stack child when instructor moves down and back 
   });
 });
 
+test('setting a boundary ahead updates the release without pulling the student forward', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 2, v: 0, f: -1 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.studentBoundary?.h === 2
+      && status.indices.h === 0
+      && status.indices.v === 0;
+  });
+});
+
 test('student can rewind off an explicit-boundary flat slide and return to the latest instructor fragment', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -581,6 +610,10 @@ test('student can rewind off an explicit-boundary flat slide and return to the l
     indices: { h: 2, v: 0, f: -1 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(2, 0, -1);
   });
 
   await page.waitForFunction(() => {
@@ -642,6 +675,22 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, 0);
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
   });
 
   await page.waitForFunction(() => {
@@ -707,6 +756,18 @@ test('same-h top-slide fragment pullback exact-locks fragments and clears on bou
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, 0);
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
   });
 
   await page.waitForFunction(() => {
@@ -801,6 +862,10 @@ test('explicit boundary exact-locks a flat slide to the instructor fragment posi
     syncToBoundary: true,
   });
 
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: -1 },
+  });
+
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 2 && status.indices.v === 0 && status.indices.f === -1;
@@ -831,6 +896,10 @@ test('explicit boundary exact-locks a flat slide to the instructor fragment posi
     indices: { h: 2, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 2, indexv: 0, indexf: 0 },
   });
 
   await page.waitForFunction(() => {
@@ -866,6 +935,10 @@ test('same-h boundary reset leaves released stack children locally navigable', a
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: -1 },
   });
 
   await page.waitForFunction(() => {
@@ -939,6 +1012,10 @@ test('student descending into a lower stack child sees all fragments on that chi
     syncToBoundary: true,
   });
 
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
@@ -989,6 +1066,10 @@ test('no-back mode treats the boundary as both min and max and snaps back to the
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: -1 },
   });
 
   await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().indices.h === 1);
@@ -1045,6 +1126,10 @@ test('no-back mode blocks same-h fragment rewind and vertical up from the last a
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
   });
 
   await page.waitForFunction(() => {
@@ -1367,6 +1452,10 @@ test('right-arrow does not stand in for down when only stack descent is availabl
     syncToBoundary: true,
   });
 
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
@@ -1500,6 +1589,10 @@ test('up/down navigation stays vertical and does not consume fragments', async (
     syncToBoundary: true,
   });
 
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, 0);
+  });
+
   await page.waitForFunction(() => {
     const status = window.RevealIframeSyncAPI.getStatus();
     return status.indices.h === 1
@@ -1542,6 +1635,10 @@ test('up/down control buttons stay vertical and do not consume fragments', async
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
     syncToBoundary: true,
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, 0);
   });
 
   await page.waitForFunction(() => {

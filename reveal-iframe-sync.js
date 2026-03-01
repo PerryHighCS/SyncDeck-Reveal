@@ -1119,16 +1119,12 @@
     }));
 
     if (ctx.state.role === 'student') {
-      if (options.syncToBoundary) {
-        // Jump student to the boundary slide.
+      // A boundary grant changes the released region but should not pull a
+      // student forward on its own. Only snap when the student is already past
+      // the new boundary; later synced instructor movement can still pull them.
+      if (isPastBoundary) {
         ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
         lastAllowedTarget = snapTarget;
-      } else {
-        // Rubber band: if student is already past the new boundary, snap back.
-        if (isPastBoundary) {
-          ctx.deck.slide(snapTarget.h, snapTarget.v, snapTarget.f);
-          lastAllowedTarget = snapTarget;
-        }
       }
     }
 

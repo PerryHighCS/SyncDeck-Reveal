@@ -93,6 +93,9 @@ test.describe('iframe host relay behavior', () => {
       releaseStartH: 0,
       syncToBoundary: true,
     });
+    await postCommand(page, 'setState', {
+      state: { indexh: 1, indexv: 0, indexf: -1 },
+    });
 
     await page.waitForFunction(() => {
       const frame = document.getElementById('deck-frame');

@@ -291,6 +291,10 @@ test.describe('manual regression lab storyboard thumbnails', () => {
       syncToBoundary: true,
     }, 'manual-regression-lab');
 
+    await sendCommand(page, 'setState', {
+      state: { indexh: 4, indexv: 0, indexf: 0 },
+    }, 'manual-regression-lab');
+
     await page.waitForFunction(() => {
       const status = window.RevealIframeSyncAPI.getStatus();
       return status.indices.h === 4
