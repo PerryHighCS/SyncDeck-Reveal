@@ -27,6 +27,13 @@ Prefer checking both:
 3. Keep browser devtools open so you can inspect `postMessage` traffic or DOM
    state if something looks wrong.
 
+Network note:
+
+- This deck depends on external network access to `unpkg.com`,
+  `fonts.googleapis.com`, and `fonts.gstatic.com`.
+- If those hosts are blocked or unavailable, the manual run is not
+  representative; confirm asset loads before interpreting failures.
+
 ## Boundary And Navigation
 
 ### Student at boundary `h` with remaining fragments but no horizontal release
