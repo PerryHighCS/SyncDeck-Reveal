@@ -1391,6 +1391,14 @@ test('student keyboard handling enables only allowed directions and blocks overv
     window.RevealIframeSyncAPI.setRole('student');
   });
 
+  await page.waitForFunction(() => {
+    const configs = window.Reveal.__debug.configured;
+    const config = configs[configs.length - 1];
+    return config?.overview === false
+      && config?.touch === false
+      && config?.keyboard === false;
+  });
+
   let config = await latestDeckConfig(page);
   expect(config.overview).toBe(false);
   expect(config.touch).toBe(false);
@@ -1399,6 +1407,16 @@ test('student keyboard handling enables only allowed directions and blocks overv
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: -1 },
     releaseStartH: 0,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    const configs = window.Reveal.__debug.configured;
+    const config = configs[configs.length - 1];
+    return status.studentBoundary?.h === 1
+      && config?.overview === false
+      && config?.touch === true
+      && config?.keyboard === false;
   });
 
   config = await latestDeckConfig(page);
@@ -1447,6 +1465,14 @@ test('student keyboard handling enables only allowed directions and blocks overv
   for (const key of ['Escape', 'o', 'f']) {
     await page.keyboard.press(key);
   }
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.overview === false;
+  });
 
   status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
   expect(status.indices).toEqual({ h: 1, v: 0, f: -1 });
