@@ -5,13 +5,6 @@ on:
     branches:
       - main
       - test/**
-    paths:
-      - '.github/workflows/publish-manual-test.yml'
-      - 'reveal-iframe-sync.js'
-      - 'reveal-storyboard.js'
-      - 'chalkboard/**'
-      - 'test/manual-regression-lab.html'
-      - 'test/MANUAL_REGRESSION_CHECKLIST.md'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +17,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.filter.outputs.publish }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect publish-relevant changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            publish:
+              - '.github/workflows/publish-manual-test.yml'
+              - 'reveal-iframe-sync.js'
+              - 'reveal-storyboard.js'
+              - 'chalkboard/**'
+              - 'test/manual-regression-lab.html'
+
   deploy:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.publish == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -53,7 +71,6 @@ jobs:
             'reveal-iframe-sync.js',
             'reveal-storyboard.js',
             'test/manual-regression-lab.html',
-            'test/MANUAL_REGRESSION_CHECKLIST.md',
           ]
 
           for relative in files_to_copy:
@@ -136,7 +153,6 @@ jobs:
     <p>This Pages deployment publishes the manual-regression Reveal deck plus the local runtime files it depends on.</p>
     <ul>
       <li><a href="./test/manual-regression-lab.html">Open the manual regression deck</a></li>
-      <li><a href="./test/MANUAL_REGRESSION_CHECKLIST.md">Open the manual regression checklist</a></li>
     </ul>
     <p>Use the deck in an instructor/student setup. The slides themselves contain the runbook for each manual scenario.</p>
   </main>
@@ -155,3 +171,12 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  noop:
+    needs: changes
+    if: github.event_name != 'workflow_dispatch' && needs.changes.outputs.publish != 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: No publishable changes
+        run: echo "No manual-deck publishing inputs changed; skipping Pages deploy."
