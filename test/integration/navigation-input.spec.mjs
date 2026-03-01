@@ -59,6 +59,64 @@ test('student pause lock keeps the deck paused, hides storyboard, and blocks loc
   expect(status.paused).toBe(false);
 });
 
+test('student mirrors paused state from a relayed instructor setState payload', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 0, indexv: 0, indexf: -1, paused: true },
+  });
+
+  await expect(page.locator('[data-reveal-sync-pause-overlay="true"]')).toBeVisible();
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.paused).toBe(true);
+
+  await page.evaluate(() => {
+    window.Reveal.togglePause(false);
+  });
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().paused === true);
+
+  await sendCommand(page, 'setState', {
+    state: { indexh: 0, indexv: 0, indexf: -1, paused: false },
+  });
+
+  await expect(page.locator('[data-reveal-sync-pause-overlay="true"]')).toBeHidden();
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.paused).toBe(false);
+});
+
+test('student role suppresses native Reveal pause UI affordances', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    const nativeOverlay = document.createElement('div');
+    nativeOverlay.className = 'pause-overlay';
+    nativeOverlay.textContent = 'Native pause overlay';
+    document.body.appendChild(nativeOverlay);
+
+    const nativeButton = document.createElement('button');
+    nativeButton.className = 'resume-button';
+    nativeButton.textContent = 'Resume presentation';
+    document.body.appendChild(nativeButton);
+
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await expect(page.locator('.pause-overlay')).toBeHidden();
+  await expect(page.locator('.resume-button')).toBeHidden();
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+  });
+
+  await expect(page.locator('.pause-overlay')).toBeVisible();
+  await expect(page.locator('.resume-button')).toBeVisible();
+});
+
 test('student follow-instructor mode auto-captures boundary from synced state after clearBoundary', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -1409,6 +1467,26 @@ test('instructor role keeps Reveal keyboard enabled for unrestricted shortcuts',
   expect(config.keyboard).toBe(true);
 });
 
+test('instructor pause shortcuts toggle paused state with b and p', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+  });
+
+  await page.keyboard.press('b');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().paused === true);
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.paused).toBe(true);
+
+  await page.keyboard.press('p');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().paused === false);
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.paused).toBe(false);
+});
+
 test('student arrow keys still navigate when focus is on a control button', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -2005,6 +2083,8 @@ test('chalkboard commands are routed to the chalkboard API and student role enab
   await sendCommand(page, 'chalkboardState', {
     storage: { board: 'restored' },
   });
+
+  await page.waitForFunction(() => window.__chalkboardCalls.length === 7);
 
   const calls = await page.evaluate(() => window.__chalkboardCalls);
   expect(calls).toEqual([

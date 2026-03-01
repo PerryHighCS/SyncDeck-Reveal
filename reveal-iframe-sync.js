@@ -833,6 +833,32 @@
     return overlay;
   }
 
+  function ensureNativePauseSuppressionStyles() {
+    if (document.getElementById('syncdeck-native-pause-suppression')) return;
+
+    const style = document.createElement('style');
+    style.id = 'syncdeck-native-pause-suppression';
+    style.textContent = [
+      'body[data-syncdeck-hide-native-pause="true"] .pause-overlay,',
+      'body[data-syncdeck-hide-native-pause="true"] .pause-help,',
+      'body[data-syncdeck-hide-native-pause="true"] .resume-button,',
+      'body[data-syncdeck-hide-native-pause="true"] .pause-screen,',
+      'body[data-syncdeck-hide-native-pause="true"] [aria-label="Resume presentation"],',
+      'body[data-syncdeck-hide-native-pause="true"] button[title="Resume presentation"] {',
+      '  display: none !important;',
+      '  visibility: hidden !important;',
+      '  opacity: 0 !important;',
+      '}',
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function syncNativePauseUiSuppression(ctx) {
+    ensureNativePauseSuppressionStyles();
+    const shouldHideNativePauseUi = ctx.state.role === 'student';
+    document.body?.setAttribute('data-syncdeck-hide-native-pause', shouldHideNativePauseUi ? 'true' : 'false');
+  }
+
   function createPauseInputBlocker(ctx) {
     return (event) => {
       if (!ctx.state.pauseLockedByHost) return;
@@ -919,6 +945,7 @@
   }
 
   function applyPauseLockUi(ctx) {
+    syncNativePauseUiSuppression(ctx);
     const shouldLock = ctx.state.role === 'student' && !!ctx.state.pauseLockedByHost;
     const overlay = ensurePauseOverlay(ctx);
     overlay.style.display = shouldLock ? 'flex' : 'none';
@@ -1509,6 +1536,9 @@
         if (typeof statePaused === 'boolean') {
           ctx.state.pauseLockedByHost = statePaused;
           applyPauseLockUi(ctx);
+          if (!!ctx.deck.isPaused?.() !== statePaused) {
+            ctx.deck.togglePause?.(statePaused);
+          }
         }
       }
     } finally {
@@ -1662,11 +1692,13 @@
       const isVerticalKey = event.key === 'ArrowUp' || event.key === 'ArrowDown';
       const isHorizontalKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
       const lowerKey = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+      const isInstructorPauseKey = (ctx.state.role === 'instructor' || ctx.state.role === 'standalone')
+        && (lowerKey === 'b' || lowerKey === 'p');
       const isStudentPrevKey = ctx.state.role === 'student'
         && (event.key === 'PageUp' || lowerKey === 'h');
       const isStudentNextKey = ctx.state.role === 'student'
         && (event.key === 'PageDown' || event.key === ' ' || event.code === 'Space' || lowerKey === 'l');
-      if (!isVerticalKey && !isHorizontalKey && !isStudentPrevKey && !isStudentNextKey) return;
+      if (!isVerticalKey && !isHorizontalKey && !isStudentPrevKey && !isStudentNextKey && !isInstructorPauseKey) return;
 
       if (ctx.state.role === 'student' && ctx.state.pauseLockedByHost) {
         event.preventDefault();
@@ -1699,7 +1731,9 @@
         activeElement: describeElement(document.activeElement),
       }]);
 
-      if (event.key === 'ArrowUp') {
+      if (isInstructorPauseKey) {
+        ctx.deck.togglePause?.();
+      } else if (event.key === 'ArrowUp') {
         ctx.deck.up?.();
       } else if (event.key === 'ArrowDown') {
         ctx.deck.down?.();
