@@ -982,6 +982,40 @@ test('student keyboard handling enables only allowed directions and blocks overv
 
   config = await latestDeckConfig(page);
   expect(config.keyboard).toBe(false);
+
+  let status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
+  expect(status.navigation.canGoUp).toBe(true);
+  expect(status.navigation.canGoDown).toBe(false);
+  expect(status.navigation.canGoForward).toBe(false);
+  expect(status.overview).toBe(false);
+
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.overview === false;
+  });
+
+  await page.keyboard.press('ArrowUp');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  for (const key of ['Escape', 'o', 'f']) {
+    await page.keyboard.press(key);
+  }
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.indices).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.overview).toBe(false);
 });
 
 test('instructor role keeps Reveal keyboard enabled for unrestricted shortcuts', async ({ page }) => {
