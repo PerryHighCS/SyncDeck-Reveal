@@ -800,6 +800,58 @@ test('same-h boundary reset leaves released stack children locally navigable', a
   expect(status.navigation.canGoForward).toBe(false);
 });
 
+test('student descending into a lower stack child sees all fragments on that child', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    const lowerChild = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(2)');
+    for (const label of ['Lower fragment A', 'Lower fragment B']) {
+      const fragment = document.createElement('p');
+      fragment.className = 'fragment';
+      fragment.textContent = label;
+      lowerChild.appendChild(fragment);
+    }
+
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 1, v: 0, f: 0 },
+    releaseStartH: 0,
+    syncToBoundary: true,
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === 1;
+  });
+
+  const lowerChildState = await page.evaluate(() => {
+    const lowerChild = document.querySelector('.reveal .slides > section:nth-of-type(2) > section:nth-of-type(2)');
+    const fragments = Array.from(lowerChild.querySelectorAll('.fragment'));
+    return {
+      visibleCount: fragments.filter((fragment) => fragment.classList.contains('visible')).length,
+      suppressedCount: fragments.filter((fragment) => fragment.classList.contains('syncdeck-suppressed-future')).length,
+      labels: fragments.map((fragment) => fragment.textContent?.trim() || ''),
+    };
+  });
+
+  expect(lowerChildState.labels).toEqual(['Lower fragment A', 'Lower fragment B']);
+  expect(lowerChildState.visibleCount).toBe(2);
+  expect(lowerChildState.suppressedCount).toBe(0);
+});
+
 test('no-back mode treats the boundary as both min and max and snaps back to the last allowed position', async ({ page }) => {
   await configureHarness(page, {
     revealOptions: {

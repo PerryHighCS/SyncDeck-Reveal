@@ -204,6 +204,37 @@
     return !!topLevelSlide.querySelector(':scope > section');
   }
 
+  function getSlideElement(indices) {
+    const current = normalizeIndices(indices);
+    const topLevelSlides = document.querySelectorAll('.reveal .slides > section');
+    const topLevelSlide = topLevelSlides[Number(current.h)];
+    if (!topLevelSlide) return null;
+
+    const childSlides = topLevelSlide.querySelectorAll(':scope > section');
+    if (!childSlides.length) return topLevelSlide;
+    return childSlides[Math.max(0, Math.min(childSlides.length - 1, Number(current.v)))] || null;
+  }
+
+  function revealAllFragmentsIndexForSlide(indices) {
+    const slide = getSlideElement(indices);
+    if (!slide) return -1;
+    const fragments = slide.querySelectorAll('.fragment');
+    return fragments.length ? fragments.length - 1 : -1;
+  }
+
+  function normalizeStudentStackChildIndices(ctx, indices) {
+    const current = normalizeIndices(indices);
+    if (ctx.state.role !== 'student' || current.v === 0) {
+      return current;
+    }
+
+    return {
+      h: current.h,
+      v: current.v,
+      f: revealAllFragmentsIndexForSlide(current),
+    };
+  }
+
   function rememberTopSlideFragment(ctx, indices) {
     const current = normalizeIndices(indices ?? ctx.deck.getIndices());
     if (current.v !== 0) return;
@@ -307,7 +338,7 @@
     const targetV = direction === 'up' ? current.v - 1 : current.v + 1;
     const targetF = targetV === 0
       ? resolveTopSlideReturnFragment(ctx, current.h)
-      : -1;
+      : revealAllFragmentsIndexForSlide({ h: current.h, v: targetV, f: -1 });
 
     if (targetV === 0) {
       clearSuppressedFutureFragments();
@@ -1010,7 +1041,7 @@
       : incoming;
 
     return {
-      applied,
+      applied: normalizeStudentStackChildIndices(ctx, applied),
       syncedBoundary: incoming,
     };
   }
@@ -1124,7 +1155,7 @@
     if (ctx.state.role !== 'student') return;
     if (!ctx.state.studentMaxIndices) return;
 
-    const current = normalizeIndices(ctx.deck.getIndices());
+    const current = normalizeStudentStackChildIndices(ctx, ctx.deck.getIndices());
     const max = normalizeBoundaryIndices(ctx.state.studentMaxIndices);
     const lastAllowed = ctx.state.lastAllowedStudentIndices
       ? normalizeIndices(ctx.state.lastAllowedStudentIndices)
@@ -1146,6 +1177,16 @@
     if (isPastForwardBoundary(ctx, current)) shouldReset = true;
 
     if (!shouldReset) {
+      if (compareIndices(current, normalizeIndices(ctx.deck.getIndices())) !== 0) {
+        ctx.state.applyingRemote = true;
+        try {
+          ctx.deck.slide(current.h, current.v, current.f);
+        } finally {
+          queueMicrotask(() => {
+            ctx.state.applyingRemote = false;
+          });
+        }
+      }
       ctx.state.lastAllowedStudentIndices = current;
       return;
     }
