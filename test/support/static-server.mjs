@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 const MIME_TYPES = {
@@ -51,12 +51,19 @@ export async function startStaticServer(rootDir) {
     }
 
     try {
-      const contents = await readFile(filePath);
-      res.writeHead(200, { 'content-type': contentTypeFor(filePath) });
       if (method === 'HEAD') {
+        const info = await stat(filePath);
+        if (!info.isFile()) throw new Error('Not a file');
+        res.writeHead(200, {
+          'content-type': contentTypeFor(filePath),
+          'content-length': String(info.size),
+        });
         res.end();
         return;
       }
+
+      const contents = await readFile(filePath);
+      res.writeHead(200, { 'content-type': contentTypeFor(filePath) });
       res.end(contents);
     } catch {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });

@@ -964,6 +964,16 @@ body.storyboard-open .reveal {
 <script src="../reveal-storyboard.js"></script>
 <script src="../reveal-iframe-sync.js"></script>
 <script>
+const params = new URLSearchParams(window.location.search);
+const sameOrigin = window.location.origin && window.location.origin !== 'null'
+  ? window.location.origin
+  : '*';
+const hostOrigin = params.get('hostOrigin') || sameOrigin;
+const allowedOrigins = (params.get('allowedOrigins') || hostOrigin)
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+
 Reveal.initialize({
   hash: true,
   hashOneBasedIndex: true,
@@ -987,8 +997,8 @@ Reveal.initialize({
   fragmentInURL: false,
   iframeSync: {
     deckId: 'manual-regression-lab',
-    hostOrigin: '*',
-    allowedOrigins: ['*'],
+    hostOrigin,
+    allowedOrigins,
     studentCanNavigateBack: true,
     studentCanNavigateForward: false,
   },

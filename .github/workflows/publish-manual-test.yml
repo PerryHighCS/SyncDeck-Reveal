@@ -52,8 +52,6 @@ jobs:
           files_to_copy = [
             'reveal-iframe-sync.js',
             'reveal-storyboard.js',
-            'chalkboard/chalkboard.js',
-            'chalkboard/chalkboard.css',
             'test/manual-regression-lab.html',
             'test/MANUAL_REGRESSION_CHECKLIST.md',
           ]
@@ -63,6 +61,10 @@ jobs:
             destination = site / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
+
+          chalkboard_source = root / 'chalkboard'
+          chalkboard_destination = site / 'chalkboard'
+          shutil.copytree(chalkboard_source, chalkboard_destination, dirs_exist_ok=True)
 
           index = site / 'index.html'
           index.write_text(
