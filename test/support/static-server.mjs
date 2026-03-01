@@ -30,7 +30,15 @@ export async function startStaticServer(rootDir) {
       return;
     }
 
-    const reqPath = new URL(req.url, 'http://127.0.0.1').pathname;
+    let reqPath;
+    try {
+      reqPath = new URL(req.url || '/', 'http://127.0.0.1').pathname;
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end('Bad request');
+      return;
+    }
+
     let relativePath;
 
     try {

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { expect, test } from '@playwright/test';
+import { sendCommand } from '../support/iframe-sync-helpers.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirname, '../fixtures/runtime-harness.html');
@@ -11,23 +12,6 @@ async function configureHarness(page, config) {
   await page.addInitScript((value) => {
     window.__syncHarnessConfig = value;
   }, config);
-}
-
-async function sendCommand(page, name, payload = {}) {
-  await page.evaluate(
-    ({ commandName, commandPayload }) => {
-      window.postMessage({
-        type: 'reveal-sync',
-        action: 'command',
-        deckId: 'fixture-deck',
-        payload: {
-          name: commandName,
-          payload: commandPayload,
-        },
-      }, '*');
-    },
-    { commandName: name, commandPayload: payload },
-  );
 }
 
 async function latestDeckConfig(page) {

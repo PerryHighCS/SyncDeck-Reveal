@@ -2,27 +2,11 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { expect, test } from '@playwright/test';
+import { sendCommand } from '../support/iframe-sync-helpers.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirname, '../fixtures/runtime-harness.html');
 const fixtureUrl = pathToFileURL(fixturePath);
-
-async function sendCommand(page, name, payload = {}) {
-  await page.evaluate(
-    ({ commandName, commandPayload }) => {
-      window.postMessage({
-        type: 'reveal-sync',
-        action: 'command',
-        deckId: 'fixture-deck',
-        payload: {
-          name: commandName,
-          payload: commandPayload,
-        },
-      }, '*');
-    },
-    { commandName: name, commandPayload: payload },
-  );
-}
 
 test('student explicit boundary updates status, navigation, and released storyboard region', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
