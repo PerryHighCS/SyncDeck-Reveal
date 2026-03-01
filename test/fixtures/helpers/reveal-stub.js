@@ -27,14 +27,17 @@
   }
 
   function createRevealStub(options) {
+    const iframeSyncConfig = {
+      deckId: 'fixture-deck',
+      hostOrigin: '*',
+      allowedOrigins: ['*'],
+      autoAnnounceReady: false,
+      ...(options?.iframeSync || {}),
+    };
+
     const config = {
-      iframeSync: {
-        deckId: 'fixture-deck',
-        hostOrigin: '*',
-        allowedOrigins: ['*'],
-        autoAnnounceReady: false,
-      },
       ...options,
+      iframeSync: iframeSyncConfig,
     };
 
     const eventBus = createEventBus();
