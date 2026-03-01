@@ -64,7 +64,7 @@
   }
 
   function debugLog(...args) {
-    console.log('[RevealIframeSync]', ...args);
+    void args;
   }
 
   function describeElement(element) {
@@ -285,10 +285,6 @@
       canMoveVertically,
       activeElement: describeElement(document.activeElement),
     });
-    if (direction === 'down') {
-      console.trace('[RevealIframeSync] down trace');
-    }
-
     if (ctx.state.role === 'student') {
       const nav = buildNavigationStatus(ctx);
       if (!(direction === 'up' ? nav.canGoUp : nav.canGoDown)) {
