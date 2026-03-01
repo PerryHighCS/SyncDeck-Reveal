@@ -530,16 +530,135 @@ body::before {
 .storyboard-track {
   display: flex;
   gap: 14px;
+  align-items: flex-start;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 6px;
+}
+
+.story-thumb {
+  min-width: 212px;
+  max-width: 212px;
+  height: 150px;
+  padding: 8px;
+  border: 1px solid rgba(103, 219, 198, 0.24);
+  border-radius: 10px;
+  background: rgba(14, 20, 24, 0.96);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  text-align: left;
+}
+
+.story-thumb:hover {
+  border-color: rgba(103, 219, 198, 0.48);
+  color: var(--text);
+}
+
+.story-thumb.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(103, 219, 198, 0.3) inset;
+}
+
+.story-thumb-locked {
+  cursor: default;
+  border-style: dashed;
+  border-color: rgba(255, 173, 92, 0.45);
+  background: rgba(18, 22, 26, 0.96);
+}
+
+.story-lock-body {
+  width: 192px;
+  height: 108px;
+  flex: 0 0 108px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 173, 92, 0.4);
+  background: rgba(255, 173, 92, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-warm);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.story-num {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 219, 198, 0.22);
+  background: rgba(8, 12, 14, 0.82);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.story-preview {
+  width: 192px;
+  height: 108px;
+  flex: 0 0 108px;
+  border-radius: 6px;
+  border: 1px solid rgba(103, 219, 198, 0.16);
+  overflow: hidden;
+  background: #10161b;
+}
+
+.story-scene {
+  width: 1600px;
+  height: 900px;
+  transform: scale(0.12);
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.story-scene .slides {
+  position: static;
+  inset: auto;
+  width: 1600px;
+  height: 900px;
+  transform: none;
+}
+
+.story-scene .slides > section,
+.story-scene .slides > section > section {
+  position: relative;
+  display: block;
+  top: auto;
+  left: auto;
+  width: 1600px;
+  height: 900px;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.story-caption {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 body.storyboard-open .storyboard {
   transform: translateY(0);
+  min-height: 176px;
 }
 
 body.storyboard-open .reveal {
-  transform: translateY(-108px);
+  transform: translateY(-176px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -590,8 +709,8 @@ body.storyboard-open .reveal {
           </div>
           <div class="status-card">
             <span class="label">Stack</span>
-            <span class="value">Slides 4.1 to 4.3</span>
-            <span class="note">Use these child slides for stack release and no-back checks.</span>
+            <span class="value">Two grouped stack regions</span>
+            <span class="note">Use the core 3-slide stack plus the later 2-slide stack for release and grouping checks.</span>
           </div>
           <div class="status-card">
             <span class="label">Host rule</span>
@@ -630,6 +749,7 @@ body.storyboard-open .reveal {
               <li>The storyboard strip opens with <code>M</code> and shows thumbnails for this deck.</li>
               <li>The student sees the custom storyboard strip, not Reveal's built-in overview grid.</li>
               <li>The host can set boundaries from the instructor storyboard.</li>
+              <li>Stacked topics appear as grouped storyboard entries rather than a flat list of child-slide thumbnails.</li>
             </ul>
             <div class="signal-row">
               <div class="signal">
@@ -899,6 +1019,71 @@ body.storyboard-open .reveal {
     </section>
 
     <section>
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Storyboard Stack 1 / 2</div>
+          <h2>Secondary Stack: Grouped Topic Entry</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>Release the student to this later stack after the first stack tests are complete.</li>
+                <li>Open the storyboard and confirm this topic appears as one grouped horizontal entry with child buttons.</li>
+                <li>Navigate into child 2 from the storyboard child controls and from in-deck vertical navigation.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>The storyboard shows a second stack badge for this topic.</li>
+                <li>The grouped entry stays anchored to one horizontal position while the active child indicator moves within the stack.</li>
+                <li>Releasing this stack does not flatten it into two separate horizontal thumbnails.</li>
+              </ul>
+              <div class="stack-map">
+                <div class="stack-node">
+                  <span class="step">Child 1</span>
+                  <strong>Entry</strong>
+                  <p>Use this child to verify the grouped stack thumbnail appears before entering deeper content.</p>
+                </div>
+                <div class="stack-node">
+                  <span class="step">Child 2</span>
+                  <strong>Detail</strong>
+                  <p>Move here to verify storyboard child buttons and same-topic highlighting stay aligned.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="slide-inner">
+          <div class="deck-tag">Storyboard Stack 2 / 2</div>
+          <h2>Secondary Stack: Release Range Hold</h2>
+          <div class="test-layout">
+            <div class="panel">
+              <h3>Action</h3>
+              <ol class="checklist">
+                <li>With the student on child 2, move the boundary back and forward around this stack from the instructor storyboard.</li>
+                <li>Try leaving the stack horizontally without granting the next topic.</li>
+                <li>Switch roles or refresh the storyboard strip once while this stack is active.</li>
+              </ol>
+            </div>
+            <div class="panel">
+              <h3>Expected</h3>
+              <ul class="checklist expected-list">
+                <li>The released-region highlight still tracks the horizontal stack entry, not each child independently.</li>
+                <li>Student navigation stays confined to the allowed child slides until a new horizontal release is granted.</li>
+                <li>Storyboard re-render preserves the grouped stack entry and active-child state.</li>
+              </ul>
+              <div class="callout">Use this second stack as the manual check that grouped stack rendering still holds after other role and boundary operations have already exercised the deck.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section>
       <div class="slide-inner">
         <div class="deck-tag">Touch / Mobile</div>
         <h2>Mobile Swipe Validation</h2>
@@ -944,6 +1129,7 @@ body.storyboard-open .reveal {
             <h3>Result</h3>
             <ul class="checklist">
               <li>Pass/fail per scenario</li>
+              <li>Whether both stack regions stayed grouped correctly in the storyboard</li>
               <li>Any visible flicker or transient navigation escape</li>
               <li>Any mismatch between manual behavior and the automated suite</li>
             </ul>
