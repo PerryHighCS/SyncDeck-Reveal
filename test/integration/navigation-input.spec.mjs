@@ -245,6 +245,54 @@ test('student follow-instructor mode keeps pulling on next and prev commands aft
   expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
 });
 
+test('relative-only next commands seed instructor sync state for later stack-preserving follow mode', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'clearBoundary');
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+
+  await sendCommand(page, 'next');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1
+      && status.studentBoundary?.h === 1;
+  });
+
+  await page.evaluate(() => {
+    window.Reveal.down();
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.studentBoundary?.h === 1;
+  });
+
+  await sendCommand(page, 'next');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 1
+      && status.indices.f === -1
+      && status.studentBoundary?.h === 1;
+  });
+
+  const status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.navigation.current).toEqual({ h: 1, v: 1, f: -1 });
+  expect(status.studentBoundary).toEqual({ h: 1, v: 0, f: -1 });
+  expect(status.navigation.maxIndices).toEqual({ h: 1, v: 0, f: -1 });
+});
+
 test('student stays on the top stack slide when instructor next moves deeper within the same stack', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

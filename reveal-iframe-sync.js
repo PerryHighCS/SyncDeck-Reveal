@@ -1460,6 +1460,8 @@
             boundaryCaptureTarget = payload.__resolvedSyncBoundary;
           } else {
             deck.next();
+            boundaryCaptureTarget = normalizeIndices(ctx.deck.getIndices());
+            ctx.state.lastSyncedInstructorIndices = boundaryCaptureTarget;
           }
           shouldCaptureStudentBoundary = true;
           break;
@@ -1469,6 +1471,8 @@
             boundaryCaptureTarget = payload.__resolvedSyncBoundary;
           } else {
             deck.prev();
+            boundaryCaptureTarget = normalizeIndices(ctx.deck.getIndices());
+            ctx.state.lastSyncedInstructorIndices = boundaryCaptureTarget;
           }
           shouldCaptureStudentBoundary = true;
           break;
