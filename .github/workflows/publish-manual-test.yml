@@ -3,7 +3,7 @@ name: Publish Manual Regression Deck
 on:
   push:
     branches:
-      - '**'
+      - main
   pull_request:
     branches:
       - main
@@ -19,6 +19,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  always_job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Always-pass status
+        run: echo "publish-manual-test workflow evaluated successfully."
+
   changes:
     runs-on: ubuntu-latest
     outputs:
