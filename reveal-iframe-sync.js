@@ -738,8 +738,8 @@
       const blockBack = isStudent && !allowLeftShortcut;
       const blockUp = isStudent && !nav.canGoUp;
       const blockDown = isStudent && !nav.canGoDown;
-      const showRight = isStudent ? allowRightShortcut : nav.canGoForward;
-      const showLeft = isStudent ? allowLeftShortcut : nav.canGoBack;
+      const showRight = allowRightShortcut;
+      const showLeft = allowLeftShortcut;
       const showUp = nav.canGoUp;
       const showDown = nav.canGoDown;
 
