@@ -3,13 +3,10 @@ name: Publish Manual Regression Deck
 on:
   push:
     branches:
+      - '**'
+  pull_request:
+    branches:
       - main
-    paths:
-      - '.github/workflows/publish-manual-test.yml'
-      - 'reveal-iframe-sync.js'
-      - 'reveal-storyboard.js'
-      - 'chalkboard/**'
-      - 'test/manual-regression-lab.html'
   workflow_dispatch:
 
 permissions:
@@ -47,7 +44,9 @@ jobs:
 
   deploy:
     needs: changes
-    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.publish == 'true'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.publish == 'true')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -179,7 +178,11 @@ jobs:
 
   noop:
     needs: changes
-    if: github.event_name != 'workflow_dispatch' && needs.changes.outputs.publish != 'true'
+    if: >-
+      !(
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.publish == 'true')
+      )
     runs-on: ubuntu-latest
 
     steps:
