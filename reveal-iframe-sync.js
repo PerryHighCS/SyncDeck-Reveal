@@ -1790,7 +1790,11 @@
         const interceptControlClick = (event) => {
           const button = interceptControlPress(event);
           if (!button) return;
-          if (supportsPointerEvents) return;
+          // Pointer-originated activations were already handled on pointerdown.
+          // Keep click handling for keyboard/programmatic activation.
+          if (supportsPointerEvents && event.detail !== 0) {
+            return;
+          }
           handleDirectionalControl(button);
         };
 

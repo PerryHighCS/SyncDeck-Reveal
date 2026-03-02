@@ -1968,6 +1968,41 @@ test('student arrow keys still navigate when focus is on a control button', asyn
   });
 });
 
+test('focused control buttons still activate via keyboard when Pointer Events are supported', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('instructor');
+    window.Reveal.slide(1, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+
+  await page.locator('.reveal .controls .navigate-right').focus();
+  await page.keyboard.press('Enter');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 1
+      && status.indices.v === 0
+      && status.indices.f === 0;
+  });
+
+  await page.keyboard.press('Space');
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.indices.h === 2
+      && status.indices.v === 0
+      && status.indices.f === -1;
+  });
+});
+
 test('right-arrow semantics fall back to next on fragment-only forward locks', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
