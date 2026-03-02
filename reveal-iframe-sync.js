@@ -22,7 +22,6 @@
 (function () {
   const IFRAME_SYNC_VERSION = '2.0.0';
   const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
-  const DEBUG_LOG_ENABLED = !!window.__SYNCDECK_DEBUG;
 
   const DEFAULTS = {
     role: 'student',
@@ -65,12 +64,7 @@
   }
 
   function debugLog(...args) {
-    if (!DEBUG_LOG_ENABLED) return;
-    const nextArgs = args.length === 1 && typeof args[0] === 'function'
-      ? args[0]()
-      : args;
-    if (!Array.isArray(nextArgs)) return;
-    console.debug('[RevealIframeSync]', ...nextArgs);
+    void args;
   }
 
   function describeElement(element) {
@@ -219,6 +213,72 @@
     const childSlides = topLevelSlide.querySelectorAll(':scope > section');
     if (!childSlides.length) return topLevelSlide;
     return childSlides[Math.max(0, Math.min(childSlides.length - 1, Number(current.v)))] || null;
+  }
+
+  function getTopLevelSlideCount() {
+    return document.querySelectorAll('.reveal .slides > section').length;
+  }
+
+  function getChildSlideCount(h) {
+    const topLevelSlides = document.querySelectorAll('.reveal .slides > section');
+    const topLevelSlide = topLevelSlides[Number(h)];
+    if (!topLevelSlide) return 0;
+    return topLevelSlide.querySelectorAll(':scope > section').length;
+  }
+
+  function getFragmentCount(indices) {
+    const slide = getSlideElement(indices);
+    if (!slide) return 0;
+    return slide.querySelectorAll('.fragment').length;
+  }
+
+  function stepIndicesNext(indices) {
+    const current = normalizeIndices(indices);
+    const fragmentCount = getFragmentCount(current);
+    if (current.f < fragmentCount - 1) {
+      return { h: current.h, v: current.v, f: current.f + 1 };
+    }
+
+    const childSlideCount = getChildSlideCount(current.h);
+    if (childSlideCount > 0 && current.v < childSlideCount - 1) {
+      return { h: current.h, v: current.v + 1, f: -1 };
+    }
+
+    return {
+      h: Math.min(getTopLevelSlideCount() - 1, current.h + 1),
+      v: 0,
+      f: -1,
+    };
+  }
+
+  function stepIndicesPrev(indices) {
+    const current = normalizeIndices(indices);
+    if (current.f > -1) {
+      return { h: current.h, v: current.v, f: current.f - 1 };
+    }
+
+    const childSlideCount = getChildSlideCount(current.h);
+    if (childSlideCount > 0 && current.v > 0) {
+      const prevV = current.v - 1;
+      return {
+        h: current.h,
+        v: prevV,
+        f: getFragmentCount({ h: current.h, v: prevV, f: -1 }) - 1,
+      };
+    }
+
+    if (current.h <= 0) {
+      return { h: 0, v: 0, f: -1 };
+    }
+
+    const prevH = current.h - 1;
+    const prevChildCount = getChildSlideCount(prevH);
+    const prevV = prevChildCount > 0 ? prevChildCount - 1 : 0;
+    return {
+      h: prevH,
+      v: prevV,
+      f: getFragmentCount({ h: prevH, v: prevV, f: -1 }) - 1,
+    };
   }
 
   function revealAllFragmentsIndexForSlide(indices) {
@@ -1123,14 +1183,14 @@
     });
   }
 
-  function applySyncedState(ctx, payload) {
+  function applySyncedState(ctx, payload, options = {}) {
     if (!payload?.state) return null;
 
     // Strip `overview` before applying — Reveal's built-in grid overview
     // should never be activated on the receiving end. Instead, route the
     // overview flag to the custom bottom-of-screen storyboard strip.
     const { overview, ...safeState } = payload.state;
-    const resolvedState = resolveStudentSyncedState(ctx, safeState);
+    const resolvedState = resolveStudentSyncedState(ctx, safeState, options);
     ctx.deck.setState({
       ...safeState,
       indexh: resolvedState.applied.h,
@@ -1144,7 +1204,23 @@
     return resolvedState;
   }
 
-  function resolveStudentSyncedState(ctx, state) {
+  function applyRelativeInstructorSync(ctx, direction) {
+    const baseIndices = normalizeIndices(ctx.state.lastSyncedInstructorIndices ?? ctx.deck.getIndices());
+    const nextIndices = direction === 'prev'
+      ? stepIndicesPrev(baseIndices)
+      : stepIndicesNext(baseIndices);
+
+    ctx.state.lastSyncedInstructorIndices = nextIndices;
+    return applySyncedState(ctx, {
+      state: {
+        indexh: nextIndices.h,
+        indexv: nextIndices.v,
+        indexf: nextIndices.f,
+      },
+    });
+  }
+
+  function resolveStudentSyncedState(ctx, state, options = {}) {
     const incoming = stateIndicesFromPayload(state);
 
     if (ctx.state.role !== 'student') {
@@ -1152,7 +1228,8 @@
     }
 
     const current = normalizeIndices(ctx.deck.getIndices());
-    const preserveLocalStackPosition = current.h === incoming.h
+    const preserveLocalStackPosition = !options.forceExact
+      && current.h === incoming.h
       && topLevelSlideHasVerticalChildren(incoming.h)
       && (current.v > 0 || incoming.v > 0);
     const applied = preserveLocalStackPosition
@@ -1165,8 +1242,10 @@
       clearSuppressedFutureFragments();
     }
 
+    const normalizedApplied = normalizeStudentVisibleIndices(ctx, applied);
+
     return {
-      applied: normalizeStudentVisibleIndices(ctx, applied),
+      applied: normalizedApplied,
       syncedBoundary: incoming,
     };
   }
@@ -1381,31 +1460,55 @@
     try {
       switch (command.name) {
         case 'next':
-          deck.next();
+          if (ctx.state.role === 'student' && !ctx.state.hasExplicitBoundary && ctx.state.lastSyncedInstructorIndices) {
+            payload.__resolvedSyncBoundary = applyRelativeInstructorSync(ctx, 'next')?.syncedBoundary || null;
+            boundaryCaptureTarget = payload.__resolvedSyncBoundary;
+          } else {
+            deck.next();
+          }
           shouldCaptureStudentBoundary = true;
           break;
         case 'prev':
-          deck.prev();
+          if (ctx.state.role === 'student' && !ctx.state.hasExplicitBoundary && ctx.state.lastSyncedInstructorIndices) {
+            payload.__resolvedSyncBoundary = applyRelativeInstructorSync(ctx, 'prev')?.syncedBoundary || null;
+            boundaryCaptureTarget = payload.__resolvedSyncBoundary;
+          } else {
+            deck.prev();
+          }
           shouldCaptureStudentBoundary = true;
           break;
         case 'slide':
-          deck.slide(payload.h ?? 0, payload.v ?? 0, payload.f);
+          if (ctx.state.role === 'student') {
+            payload.__resolvedSyncBoundary = applySyncedState(ctx, {
+              state: {
+                indexh: payload.h ?? 0,
+                indexv: payload.v ?? 0,
+                indexf: payload.f,
+              },
+            })?.syncedBoundary || null;
+            boundaryCaptureTarget = payload.__resolvedSyncBoundary;
+          } else {
+            deck.slide(payload.h ?? 0, payload.v ?? 0, payload.f);
+            boundaryCaptureTarget = normalizeIndices({ h: payload.h ?? 0, v: payload.v ?? 0, f: payload.f });
+          }
           shouldCaptureStudentBoundary = true;
-          boundaryCaptureTarget = normalizeIndices({ h: payload.h ?? 0, v: payload.v ?? 0, f: payload.f });
+          ctx.state.lastSyncedInstructorIndices = boundaryCaptureTarget;
           break;
         case 'setState':
           payload.__resolvedSyncBoundary = applySyncedState(ctx, payload)?.syncedBoundary || null;
           shouldCaptureStudentBoundary = true;
           boundaryCaptureTarget = payload.__resolvedSyncBoundary;
+          ctx.state.lastSyncedInstructorIndices = boundaryCaptureTarget;
           break;
         case 'syncToInstructor':
           if (ctx.state.role === 'student') {
             resetStudentFollowInstructorState(ctx);
           }
-          payload.__resolvedSyncBoundary = applySyncedState(ctx, payload)?.syncedBoundary || null;
+          payload.__resolvedSyncBoundary = applySyncedState(ctx, payload, { forceExact: true })?.syncedBoundary || null;
           shouldCaptureStudentBoundary = true;
           boundaryCaptureReason = 'syncToInstructor';
           boundaryCaptureTarget = payload.__resolvedSyncBoundary;
+          ctx.state.lastSyncedInstructorIndices = boundaryCaptureTarget;
           break;
 
         // overview commands → custom storyboard strip (not Reveal's built-in grid).
@@ -1553,7 +1656,7 @@
         emitLocalStatusEvent(ctx, boundaryCaptureReason);
       }
 
-      const syncedBoundaryIndices = (command.name === 'setState' || command.name === 'syncToInstructor')
+      const syncedBoundaryIndices = (command.name === 'setState' || command.name === 'syncToInstructor' || command.name === 'slide')
         ? payload.__resolvedSyncBoundary
         : null;
       const exactBoundaryChanged = syncedBoundaryIndices
@@ -1941,6 +2044,7 @@
         boundaryIsLocal: false,      // true when boundary was set by storyboard button (acting instructor)
         exactStudentMaxIndices: null,
         lastAllowedStudentIndices: titleSlideBoundary(),
+        lastSyncedInstructorIndices: null,
         topSlideFragmentsByH: {},
         touchGesture: null,
         releaseStartH: null,
