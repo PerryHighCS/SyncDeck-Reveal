@@ -237,6 +237,28 @@
       next() {
         stepNext();
       },
+      left() {
+        stepPrev();
+      },
+      right() {
+        stepNext();
+      },
+      up() {
+        const currentTopLevelSlide = slides[state.indices.h];
+        const childSlides = getChildSlides(currentTopLevelSlide);
+        if (!childSlides.length || state.indices.v <= 0) return;
+        updateIndices({
+          h: state.indices.h,
+          v: state.indices.v - 1,
+          f: -1,
+        });
+      },
+      down() {
+        const currentTopLevelSlide = slides[state.indices.h];
+        const childSlides = getChildSlides(currentTopLevelSlide);
+        if (!childSlides.length || state.indices.v >= childSlides.length - 1) return;
+        updateIndices({ h: state.indices.h, v: state.indices.v + 1, f: -1 });
+      },
       setState(nextState) {
         updateIndices({
           h: nextState?.indexh ?? nextState?.indices?.h ?? 0,

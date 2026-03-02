@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "lint": "eslint reveal-iframe-sync.js reveal-storyboard.js test",
-    "test": "playwright test",
+    "test": "npm run lint && playwright test",
     "test:headed": "playwright test --headed"
   },
   "devDependencies": {
