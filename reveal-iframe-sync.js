@@ -1415,11 +1415,6 @@
     } finally {
       queueMicrotask(() => {
         ctx.state.applyingRemote = false;
-        if (ctx.state.pendingRemoteBoundaryCapture) {
-          requestAnimationFrame(() => {
-            flushPendingRemoteBoundaryCapture(ctx);
-          });
-        }
       });
     }
   }
