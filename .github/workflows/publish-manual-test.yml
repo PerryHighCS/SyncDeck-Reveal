@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '.github/workflows/publish-manual-test.yml'
+      - 'reveal-iframe-sync.js'
+      - 'reveal-storyboard.js'
+      - 'chalkboard/**'
+      - 'test/manual-regression-lab.html'
   workflow_dispatch:
 
 permissions:
