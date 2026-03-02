@@ -124,6 +124,18 @@
         pointer-events: none !important;
       }
 
+      .reveal .controls [data-syncdeck-visible="true"] {
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      .reveal .controls .navigate-left,
+      .reveal .controls .navigate-right,
+      .reveal .controls .navigate-up,
+      .reveal .controls .navigate-down {
+        transition: opacity 240ms ease;
+      }
+
       .reveal .fragment.syncdeck-suppressed-future {
         opacity: 0 !important;
         visibility: hidden !important;
@@ -834,6 +846,21 @@
 
     applyArrowLocks();
     requestAnimationFrame(applyArrowLocks);
+  }
+
+  function scheduleStandaloneControlRefresh(ctx, delayMs) {
+    if (ctx.state.standaloneControlRefreshTimer) {
+      clearTimeout(ctx.state.standaloneControlRefreshTimer);
+      ctx.state.standaloneControlRefreshTimer = null;
+    }
+
+    if (ctx.state.role !== 'standalone') return;
+
+    ctx.state.standaloneControlRefreshTimer = window.setTimeout(() => {
+      ctx.state.standaloneControlRefreshTimer = null;
+      if (ctx.state.role !== 'standalone') return;
+      updateNavigationControls(ctx);
+    }, Number.isFinite(Number(delayMs)) ? Number(delayMs) : 1000);
   }
 
   function buildSyncStatusPayload(ctx, reason) {
@@ -2052,6 +2079,7 @@
         touchGesture: null,
         releaseStartH: null,
         releaseEndH: null,
+        standaloneControlRefreshTimer: null,
       },
     };
 
@@ -2068,6 +2096,7 @@
 
     // Initialize navigation controls based on starting role and capabilities.
     updateNavigationControls(ctx);
+    scheduleStandaloneControlRefresh(ctx, 1000);
 
     const api = {
       version: IFRAME_SYNC_VERSION,
@@ -2077,6 +2106,10 @@
       getStatus: () => buildSyncStatusPayload(ctx, 'apiGetStatus'),
       setRole: (role) => {
         if (role === 'instructor' || role === 'student') {
+          if (ctx.state.standaloneControlRefreshTimer) {
+            clearTimeout(ctx.state.standaloneControlRefreshTimer);
+            ctx.state.standaloneControlRefreshTimer = null;
+          }
           ctx.state.role = role;
           ctx.state.pauseLockedByHost = false;
           applyPauseLockUi(ctx);
@@ -2106,6 +2139,10 @@
         reset: () => callChalkboard(ctx, 'reset'),
       },
       destroy: () => {
+        if (ctx.state.standaloneControlRefreshTimer) {
+          clearTimeout(ctx.state.standaloneControlRefreshTimer);
+          ctx.state.standaloneControlRefreshTimer = null;
+        }
         if (ctx.state.pauseOverlayEl) {
           ctx.state.pauseOverlayEl.remove();
           ctx.state.pauseOverlayEl = null;

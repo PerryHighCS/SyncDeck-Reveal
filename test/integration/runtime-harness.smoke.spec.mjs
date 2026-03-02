@@ -19,6 +19,9 @@ test('loads the iframe sync and storyboard runtimes into a fixture deck', async 
   expect(status.navigation.current.h).toBe(0);
   expect(status.studentBoundary).toBeNull();
 
+  await expect(page.locator('.reveal .controls .navigate-right')).toHaveAttribute('data-syncdeck-visible', 'true');
+  await expect(page.locator('.reveal .controls .navigate-right')).toHaveAttribute('aria-disabled', 'false');
+
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('reveal-storyboard-set', {
       detail: { open: true },
