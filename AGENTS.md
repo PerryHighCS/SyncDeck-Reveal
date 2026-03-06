@@ -35,6 +35,18 @@ This file applies to the `vendor/SyncDeck-Reveal/js/` submodule.
 - Add direct coverage for affected behavior areas rather than relying only on
   incidental or indirect execution.
 
+## Lint + Test Contract For New Runtime Entrypoints
+
+- Any new runtime file under this submodule (for example, a bootstrap or
+  adapter entrypoint) must be added to ESLint coverage in the same change.
+- Lint coverage must be enforced by both `eslint.config.mjs` file globs and the
+  `npm run lint` command inputs.
+- Any new public runtime API (new global, initializer, command surface, or
+  orchestration entrypoint) must ship with automated integration or smoke tests
+  that execute the API directly via fixtures under `test/fixtures/`.
+- Do not merge runtime entrypoint changes that are linted only indirectly or
+  tested only through manual verification.
+
 ## Minimum Covered Areas
 
 - Boundary lifecycle and release-region behavior.

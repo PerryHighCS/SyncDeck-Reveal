@@ -12,7 +12,7 @@ export default [
     ],
   },
   {
-    files: ['reveal-iframe-sync.js', 'reveal-storyboard.js', 'test/**/*.js'],
+    files: ['reveal-iframe-sync.js', 'reveal-storyboard.js', 'syncdeck-bootstrap.js', 'test/**/*.js'],
     ...js.configs.recommended,
     languageOptions: {
       ecmaVersion: 'latest',
