@@ -63,6 +63,20 @@ test('handles rejected Reveal.initialize without floating afterInit promise erro
   expect(result.errors.some((line) => line.includes('Reveal.initialize failed before afterInit'))).toBe(true);
 });
 
+test('logs a distinct error when afterInit callback throws', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const result = await page.evaluate(() => window.runBootstrapHarness({
+    asyncInitDelay: 5,
+    afterInitThrows: true,
+  }));
+
+  expect(result.initRejected).toBe(false);
+  expect(result.afterInitRan).toBe(false);
+  expect(result.errors.some((line) => line.includes('afterInit callback failed'))).toBe(true);
+  expect(result.errors.some((line) => line.includes('Reveal.initialize failed before afterInit'))).toBe(false);
+});
+
 test('strips chalkboard storage and emits an explicit warning', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

@@ -143,6 +143,9 @@
         },
         chalkboardOverrides: opts.chalkboardOverrides || {},
         afterInit: function () {
+          if (opts.afterInitThrows) {
+            throw new Error('fixture afterInit failure');
+          }
           window.__bootstrapHarness.afterInitRan = true;
           window.__bootstrapHarness.events.push('after-init');
         },

@@ -118,15 +118,30 @@
 
     if (typeof cfg.afterInit === 'function') {
       if (initResult && typeof initResult.then === 'function') {
-        initResult.then(function () {
-          cfg.afterInit(global.Reveal);
-        }).catch(function (error) {
-          if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
-            global.console.error('[syncdeck-bootstrap] Reveal.initialize failed before afterInit:', error);
+        initResult.then(
+          function () {
+            try {
+              cfg.afterInit(global.Reveal);
+            } catch (error) {
+              if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+                global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
+              }
+            }
+          },
+          function (error) {
+            if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+              global.console.error('[syncdeck-bootstrap] Reveal.initialize failed before afterInit:', error);
+            }
           }
-        });
+        );
       } else {
-        cfg.afterInit(global.Reveal);
+        try {
+          cfg.afterInit(global.Reveal);
+        } catch (error) {
+          if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+            global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
+          }
+        }
       }
     }
 
