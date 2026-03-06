@@ -50,7 +50,7 @@
 
   function mergePlugins(customPlugins, requiredPlugins) {
     var merged = [];
-    var seenIds = {};
+    var seenIds = Object.create(null);
     var allPlugins = []
       .concat(Array.isArray(customPlugins) ? customPlugins : [])
       .concat(Array.isArray(requiredPlugins) ? requiredPlugins : []);
@@ -59,7 +59,7 @@
       var plugin = allPlugins[i];
       if (!plugin) continue;
       if (plugin.id) {
-        if (seenIds[plugin.id]) continue;
+        if (Object.prototype.hasOwnProperty.call(seenIds, plugin.id)) continue;
         seenIds[plugin.id] = true;
       } else if (merged.indexOf(plugin) !== -1) {
         continue;
@@ -117,9 +117,17 @@
     }
 
     if (typeof cfg.afterInit === 'function') {
-      Promise.resolve(initResult).then(function () {
+      if (initResult && typeof initResult.then === 'function') {
+        initResult.then(function () {
+          cfg.afterInit(global.Reveal);
+        }).catch(function (error) {
+          if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+            global.console.error('[syncdeck-bootstrap] Reveal.initialize failed before afterInit:', error);
+          }
+        });
+      } else {
         cfg.afterInit(global.Reveal);
-      });
+      }
     }
 
     return initResult;

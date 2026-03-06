@@ -35,6 +35,7 @@
   <script>
     window.__bootstrapHarness = {
       warnings: [],
+      errors: [],
       events: [],
       initConfig: null,
       pluginIds: [],
@@ -44,14 +45,20 @@
 
     (function captureWarnings() {
       var originalWarn = console.warn;
+      var originalError = console.error;
       console.warn = function () {
         var message = Array.prototype.slice.call(arguments).join(' ');
         window.__bootstrapHarness.warnings.push(message);
         originalWarn.apply(console, arguments);
       };
+      console.error = function () {
+        var message = Array.prototype.slice.call(arguments).join(' ');
+        window.__bootstrapHarness.errors.push(message);
+        originalError.apply(console, arguments);
+      };
     }());
 
-    function buildRevealStub(asyncInitDelay) {
+    function buildRevealStub(asyncInitDelay, rejectInit) {
       var reveal = window.createRevealStub({
         iframeSync: {
           deckId: 'fixture-deck',
@@ -79,11 +86,23 @@
         if (asyncInitDelay > 0) {
           return new Promise(function (resolve) {
             setTimeout(function () {
+              if (rejectInit) {
+                window.__bootstrapHarness.events.push('initialize-rejected');
+                resolve(Promise.reject(new Error('fixture initialize rejection')));
+                return;
+              }
               initPlugins();
               window.__bootstrapHarness.events.push('initialize-resolved');
               resolve({ ok: true });
             }, asyncInitDelay);
+          }).then(function (value) {
+            return value;
           });
+        }
+
+        if (rejectInit) {
+          window.__bootstrapHarness.events.push('initialize-rejected');
+          return Promise.reject(new Error('fixture initialize rejection'));
         }
 
         initPlugins();
@@ -97,6 +116,7 @@
     window.runBootstrapHarness = async function (options) {
       var opts = options || {};
       window.__bootstrapHarness.warnings = [];
+      window.__bootstrapHarness.errors = [];
       window.__bootstrapHarness.events = [];
       window.__bootstrapHarness.initConfig = null;
       window.__bootstrapHarness.pluginIds = [];
@@ -105,10 +125,10 @@
 
       window.RevealNotes = { id: 'RevealNotes' };
       window.RevealChalkboard = { id: 'RevealChalkboard' };
-      window.Reveal = buildRevealStub(opts.asyncInitDelay || 0);
+      window.Reveal = buildRevealStub(opts.asyncInitDelay || 0, !!opts.rejectInit);
 
       var customPlugin = {
-        id: 'CustomFixturePlugin',
+        id: opts.customPluginId || 'CustomFixturePlugin',
         init: function () {
           window.__bootstrapHarness.customPluginInits += 1;
         },
@@ -128,18 +148,26 @@
         },
       });
 
-      await Promise.resolve(initResult);
+      var initRejected = false;
+      var initError = null;
+      await Promise.resolve(initResult).catch(function (error) {
+        initRejected = true;
+        initError = String(error && error.message ? error.message : error);
+      });
       await new Promise(function (resolve) {
         setTimeout(resolve, (opts.asyncInitDelay || 0) + 10);
       });
 
       return {
         warnings: window.__bootstrapHarness.warnings.slice(),
+        errors: window.__bootstrapHarness.errors.slice(),
         events: window.__bootstrapHarness.events.slice(),
         initConfig: window.__bootstrapHarness.initConfig,
         pluginIds: window.__bootstrapHarness.pluginIds.slice(),
         customPluginInits: window.__bootstrapHarness.customPluginInits,
         afterInitRan: window.__bootstrapHarness.afterInitRan,
+        initRejected: initRejected,
+        initError: initError,
         storyboardThumbs: document.querySelectorAll('#storyboard-track .story-thumb').length,
       };
     };
