@@ -35,6 +35,19 @@ test('keeps custom plugins whose ids overlap Object.prototype keys', async ({ pa
   expect(result.customPluginInits).toBe(1);
 });
 
+test('required plugins win when a custom plugin reuses a required plugin id', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const result = await page.evaluate(() => window.runBootstrapHarness({
+    includeCustomPlugins: true,
+    includeRequiredInCustomPlugins: false,
+    customPluginId: 'RevealIframeSync',
+  }));
+
+  expect(result.customPluginInits).toBe(0);
+  expect(result.pluginIds.filter((id) => id === 'RevealIframeSync')).toHaveLength(1);
+});
+
 test('runs afterInit after asynchronous Reveal.initialize resolves', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -75,6 +88,18 @@ test('logs a distinct error when afterInit callback throws', async ({ page }) =>
   expect(result.afterInitRan).toBe(false);
   expect(result.errors.some((line) => line.includes('afterInit callback failed'))).toBe(true);
   expect(result.errors.some((line) => line.includes('Reveal.initialize failed before afterInit'))).toBe(false);
+});
+
+test('logs and contains async afterInit callback rejections', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const result = await page.evaluate(() => window.runBootstrapHarness({
+    asyncInitDelay: 5,
+    afterInitRejects: true,
+  }));
+
+  expect(result.initRejected).toBe(false);
+  expect(result.errors.some((line) => line.includes('afterInit callback failed'))).toBe(true);
 });
 
 test('strips chalkboard storage and emits an explicit warning', async ({ page }) => {

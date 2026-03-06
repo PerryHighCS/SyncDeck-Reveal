@@ -51,23 +51,48 @@
   function mergePlugins(customPlugins, requiredPlugins) {
     var merged = [];
     var seenIds = Object.create(null);
-    var allPlugins = []
-      .concat(Array.isArray(customPlugins) ? customPlugins : [])
-      .concat(Array.isArray(requiredPlugins) ? requiredPlugins : []);
+    var sources = [
+      { plugins: Array.isArray(customPlugins) ? customPlugins : [], required: false },
+      { plugins: Array.isArray(requiredPlugins) ? requiredPlugins : [], required: true },
+    ];
 
-    for (var i = 0; i < allPlugins.length; i += 1) {
-      var plugin = allPlugins[i];
-      if (!plugin) continue;
-      if (plugin.id) {
-        if (Object.prototype.hasOwnProperty.call(seenIds, plugin.id)) continue;
-        seenIds[plugin.id] = true;
-      } else if (merged.indexOf(plugin) !== -1) {
-        continue;
+    for (var sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
+      var source = sources[sourceIndex];
+      var allPlugins = source.plugins;
+      for (var i = 0; i < allPlugins.length; i += 1) {
+        var plugin = allPlugins[i];
+        if (!plugin) continue;
+        if (plugin.id) {
+          if (Object.prototype.hasOwnProperty.call(seenIds, plugin.id)) {
+            if (source.required) {
+              merged[seenIds[plugin.id]] = plugin;
+            }
+            continue;
+          }
+          seenIds[plugin.id] = merged.length;
+        } else if (merged.indexOf(plugin) !== -1) {
+          continue;
+        }
+        merged.push(plugin);
       }
-      merged.push(plugin);
     }
 
     return merged;
+  }
+
+  function runAfterInit(callback, revealGlobal) {
+    try {
+      return Promise.resolve(callback(revealGlobal)).catch(function (error) {
+        if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+          global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
+        }
+      });
+    } catch (error) {
+      if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+        global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
+      }
+      return Promise.resolve();
+    }
   }
 
   function sanitizeChalkboardConfig(chalkboardConfig) {
@@ -120,13 +145,7 @@
       if (initResult && typeof initResult.then === 'function') {
         initResult.then(
           function () {
-            try {
-              cfg.afterInit(global.Reveal);
-            } catch (error) {
-              if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
-                global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
-              }
-            }
+            runAfterInit(cfg.afterInit, global.Reveal);
           },
           function (error) {
             if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
@@ -135,13 +154,7 @@
           }
         );
       } else {
-        try {
-          cfg.afterInit(global.Reveal);
-        } catch (error) {
-          if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
-            global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
-          }
-        }
+        runAfterInit(cfg.afterInit, global.Reveal);
       }
     }
 

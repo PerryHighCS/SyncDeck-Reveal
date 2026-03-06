@@ -133,18 +133,23 @@
           window.__bootstrapHarness.customPluginInits += 1;
         },
       };
+      var customPlugins = [customPlugin];
+      if (opts.includeRequiredInCustomPlugins !== false) {
+        customPlugins.push(window.RevealIframeSync);
+      }
 
       var initResult = window.initSyncDeckReveal({
         deckId: 'fixture-deck',
         revealOverrides: {
-          plugins: opts.includeCustomPlugins
-            ? [customPlugin, window.RevealIframeSync]
-            : undefined,
+          plugins: opts.includeCustomPlugins ? customPlugins : undefined,
         },
         chalkboardOverrides: opts.chalkboardOverrides || {},
         afterInit: function () {
           if (opts.afterInitThrows) {
             throw new Error('fixture afterInit failure');
+          }
+          if (opts.afterInitRejects) {
+            return Promise.reject(new Error('fixture afterInit async rejection'));
           }
           window.__bootstrapHarness.afterInitRan = true;
           window.__bootstrapHarness.events.push('after-init');
