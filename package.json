@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "eslint reveal-iframe-sync.js reveal-storyboard.js test",
+    "lint": "eslint reveal-iframe-sync.js reveal-storyboard.js syncdeck-bootstrap.js test",
     "test": "npm run lint && playwright test",
     "test:headed": "playwright test --headed"
   },

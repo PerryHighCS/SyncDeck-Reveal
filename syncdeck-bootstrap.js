@@ -48,10 +48,37 @@
     return [global.RevealNotes, global.RevealChalkboard, global.RevealIframeSync].filter(Boolean);
   }
 
+  function mergePlugins(customPlugins, requiredPlugins) {
+    var merged = [];
+    var seenIds = {};
+    var allPlugins = []
+      .concat(Array.isArray(customPlugins) ? customPlugins : [])
+      .concat(Array.isArray(requiredPlugins) ? requiredPlugins : []);
+
+    for (var i = 0; i < allPlugins.length; i += 1) {
+      var plugin = allPlugins[i];
+      if (!plugin) continue;
+      if (plugin.id) {
+        if (seenIds[plugin.id]) continue;
+        seenIds[plugin.id] = true;
+      } else if (merged.indexOf(plugin) !== -1) {
+        continue;
+      }
+      merged.push(plugin);
+    }
+
+    return merged;
+  }
+
   function sanitizeChalkboardConfig(chalkboardConfig) {
     if (chalkboardConfig && Object.prototype.hasOwnProperty.call(chalkboardConfig, 'storage')) {
       var sanitized = merge(chalkboardConfig);
       delete sanitized.storage;
+      if (typeof global.console !== 'undefined' && typeof global.console.warn === 'function') {
+        global.console.warn(
+          '[syncdeck-bootstrap] Ignoring chalkboard.storage: host-managed state is required.'
+        );
+      }
       return sanitized;
     }
     return chalkboardConfig;
@@ -75,7 +102,7 @@
     revealConfig.chalkboard = sanitizeChalkboardConfig(
       merge(CHALKBOARD_DEFAULTS, cfg.chalkboardOverrides)
     );
-    revealConfig.plugins = buildPlugins();
+    revealConfig.plugins = mergePlugins(revealConfig.plugins, buildPlugins());
 
     var initResult = global.Reveal.initialize(revealConfig);
 
@@ -90,7 +117,9 @@
     }
 
     if (typeof cfg.afterInit === 'function') {
-      cfg.afterInit(global.Reveal);
+      Promise.resolve(initResult).then(function () {
+        cfg.afterInit(global.Reveal);
+      });
     }
 
     return initResult;

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncDeck Bootstrap Harness</title>
+</head>
+<body>
+  <div class="reveal">
+    <aside class="controls">
+      <button class="navigate-left" type="button" aria-label="Previous slide"></button>
+      <button class="navigate-right" type="button" aria-label="Next slide"></button>
+      <button class="navigate-up" type="button" aria-label="Up"></button>
+      <button class="navigate-down" type="button" aria-label="Down"></button>
+    </aside>
+    <div class="slides">
+      <section><h2>Intro</h2></section>
+      <section>
+        <section><h2>Stack A</h2></section>
+        <section><h2>Stack B</h2></section>
+      </section>
+      <section><h2>Third</h2></section>
+      <section><h2>Fourth</h2></section>
+    </div>
+  </div>
+
+  <div id="storyboard" class="storyboard" aria-hidden="true">
+    <div id="storyboard-track" class="storyboard-track"></div>
+  </div>
+
+  <script src="./helpers/reveal-stub.js"></script>
+  <script src="../../reveal-iframe-sync.js"></script>
+  <script src="../../reveal-storyboard.js"></script>
+  <script src="../../syncdeck-bootstrap.js"></script>
+  <script>
+    window.__bootstrapHarness = {
+      warnings: [],
+      events: [],
+      initConfig: null,
+      pluginIds: [],
+      customPluginInits: 0,
+      afterInitRan: false,
+    };
+
+    (function captureWarnings() {
+      var originalWarn = console.warn;
+      console.warn = function () {
+        var message = Array.prototype.slice.call(arguments).join(' ');
+        window.__bootstrapHarness.warnings.push(message);
+        originalWarn.apply(console, arguments);
+      };
+    }());
+
+    function buildRevealStub(asyncInitDelay) {
+      var reveal = window.createRevealStub({
+        iframeSync: {
+          deckId: 'fixture-deck',
+          hostOrigin: '*',
+          allowedOrigins: ['*'],
+          autoAnnounceReady: false,
+        },
+      });
+
+      reveal.initialize = function (initConfig) {
+        window.__bootstrapHarness.initConfig = initConfig;
+        window.__bootstrapHarness.pluginIds = (initConfig.plugins || []).map(function (plugin) {
+          return (plugin && plugin.id) || '(anonymous)';
+        });
+        window.__bootstrapHarness.events.push('initialize-start');
+
+        function initPlugins() {
+          (initConfig.plugins || []).forEach(function (plugin) {
+            if (plugin && typeof plugin.init === 'function') {
+              plugin.init(reveal);
+            }
+          });
+        }
+
+        if (asyncInitDelay > 0) {
+          return new Promise(function (resolve) {
+            setTimeout(function () {
+              initPlugins();
+              window.__bootstrapHarness.events.push('initialize-resolved');
+              resolve({ ok: true });
+            }, asyncInitDelay);
+          });
+        }
+
+        initPlugins();
+        window.__bootstrapHarness.events.push('initialize-resolved');
+        return { ok: true };
+      };
+
+      return reveal;
+    }
+
+    window.runBootstrapHarness = async function (options) {
+      var opts = options || {};
+      window.__bootstrapHarness.warnings = [];
+      window.__bootstrapHarness.events = [];
+      window.__bootstrapHarness.initConfig = null;
+      window.__bootstrapHarness.pluginIds = [];
+      window.__bootstrapHarness.customPluginInits = 0;
+      window.__bootstrapHarness.afterInitRan = false;
+
+      window.RevealNotes = { id: 'RevealNotes' };
+      window.RevealChalkboard = { id: 'RevealChalkboard' };
+      window.Reveal = buildRevealStub(opts.asyncInitDelay || 0);
+
+      var customPlugin = {
+        id: 'CustomFixturePlugin',
+        init: function () {
+          window.__bootstrapHarness.customPluginInits += 1;
+        },
+      };
+
+      var initResult = window.initSyncDeckReveal({
+        deckId: 'fixture-deck',
+        revealOverrides: {
+          plugins: opts.includeCustomPlugins
+            ? [customPlugin, window.RevealIframeSync]
+            : undefined,
+        },
+        chalkboardOverrides: opts.chalkboardOverrides || {},
+        afterInit: function () {
+          window.__bootstrapHarness.afterInitRan = true;
+          window.__bootstrapHarness.events.push('after-init');
+        },
+      });
+
+      await Promise.resolve(initResult);
+      await new Promise(function (resolve) {
+        setTimeout(resolve, (opts.asyncInitDelay || 0) + 10);
+      });
+
+      return {
+        warnings: window.__bootstrapHarness.warnings.slice(),
+        events: window.__bootstrapHarness.events.slice(),
+        initConfig: window.__bootstrapHarness.initConfig,
+        pluginIds: window.__bootstrapHarness.pluginIds.slice(),
+        customPluginInits: window.__bootstrapHarness.customPluginInits,
+        afterInitRan: window.__bootstrapHarness.afterInitRan,
+        storyboardThumbs: document.querySelectorAll('#storyboard-track .story-thumb').length,
+      };
+    };
+  </script>
+</body>
+</html>
