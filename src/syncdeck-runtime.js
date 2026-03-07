@@ -3,6 +3,7 @@ import RevealNotes from 'reveal.js/plugin/notes/notes.esm.js';
 
 import 'reveal.js/dist/reveal.css';
 import '../chalkboard/chalkboard.css';
+// The chalkboard bundle registers RevealChalkboard on window as a side effect.
 import '../chalkboard/chalkboard.js';
 import '../reveal-storyboard.js';
 import '../reveal-iframe-sync.js';

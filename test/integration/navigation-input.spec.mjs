@@ -1232,34 +1232,44 @@ test('student can rewind off an explicit-boundary flat slide and return to the l
   await page.evaluate(() => {
     window.RevealIframeSyncAPI.setRole('student');
   });
+  await waitForStudentRole(page);
 
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 2, v: 0, f: -1 },
     releaseStartH: 0,
   });
+  await waitForStudentBoundary(page, 2);
 
   await page.evaluate(() => {
     window.Reveal.slide(2, 0, -1);
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 2
-      && status.indices.v === 0
-      && status.indices.f === -1;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.navigation.current.h === 2
+        && status.navigation.current.v === 0
+        && status.navigation.current.f === -1;
+    },
+    undefined,
+    { polling: 50 },
+  );
 
   await sendCommand(page, 'setState', {
     state: { indexh: 2, indexv: 0, indexf: 1 },
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 2
-      && status.indices.v === 0
-      && status.indices.f === 1
-      && status.navigation.canGoForward === false;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 2
+        && status.indices.v === 0
+        && status.indices.f === 1
+        && status.navigation.canGoForward === false;
+    },
+    undefined,
+    { polling: 50 },
+  );
 
   await page.evaluate(() => {
     window.Reveal.prev();
@@ -1267,13 +1277,17 @@ test('student can rewind off an explicit-boundary flat slide and return to the l
     window.Reveal.prev();
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1
-      && status.indices.v === 1
-      && status.indices.f === -1
-      && status.navigation.canGoForward === true;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.navigation.current.h === 1
+        && status.navigation.current.v === 1
+        && status.navigation.current.f === -1
+        && status.navigation.canGoForward === true;
+    },
+    undefined,
+    { polling: 50 },
+  );
 
   await page.evaluate(() => {
     window.Reveal.next();
@@ -1281,13 +1295,17 @@ test('student can rewind off an explicit-boundary flat slide and return to the l
     window.Reveal.next();
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 2
-      && status.indices.v === 0
-      && status.indices.f === 1
-      && status.navigation.canGoForward === false;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 2
+        && status.indices.v === 0
+        && status.indices.f === 1
+        && status.navigation.canGoForward === false;
+    },
+    undefined,
+    { polling: 50 },
+  );
 });
 
 test('student direct API bypass snaps back to explicit boundary and exact pullback lock', async ({ page }) => {
@@ -2267,45 +2285,59 @@ test('up/down navigation stays vertical and does not consume fragments', async (
   await page.evaluate(() => {
     window.RevealIframeSyncAPI.setRole('student');
   });
+  await waitForStudentRole(page);
 
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
   });
+  await waitForStudentBoundary(page, 1);
 
   await page.evaluate(() => {
     window.Reveal.slide(1, 0, 0);
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1
-      && status.indices.v === 0
-      && status.indices.f === 0
-      && status.navigation.canGoDown === true;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 1
+        && status.indices.v === 0
+        && status.indices.f === 0
+        && status.navigation.canGoDown === true;
+    },
+    undefined,
+    { polling: 50 },
+  );
 
   await page.evaluate(() => {
     window.Reveal.down();
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1
-      && status.indices.v === 1
-      && status.indices.f === -1;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 1
+        && status.indices.v === 1
+        && status.indices.f === -1;
+    },
+    undefined,
+    { polling: 50 },
+  );
 
   await page.evaluate(() => {
     window.Reveal.up();
   });
 
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1
-      && status.indices.v === 0
-      && status.indices.f === 0;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 1
+        && status.indices.v === 0
+        && status.indices.f === 0;
+    },
+    undefined,
+    { polling: 50 },
+  );
 });
 
 test('up/down control buttons stay vertical and do not consume fragments', async ({ page }) => {

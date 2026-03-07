@@ -4,11 +4,11 @@
   "type": "module",
   "scripts": {
     "lint": "eslint reveal-iframe-sync.js reveal-storyboard.js syncdeck-bootstrap.js src rollup.config.mjs scripts test",
-    "test": "node scripts/run-playwright.mjs",
+    "test": "npm run lint && node scripts/run-playwright.mjs",
     "test:headed": "node scripts/run-playwright.mjs --headed",
     "build": "node scripts/build-runtime.mjs",
     "build:check": "node scripts/build-check.mjs",
-    "ship": "npm run lint && npm run test && npm run build && npm run build:check"
+    "ship": "npm run test && npm run build && npm run build:check"
   },
   "dependencies": {
     "reveal.js": "5.1.0"
