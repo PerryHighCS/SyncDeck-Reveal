@@ -1314,24 +1314,26 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
   await page.evaluate(() => {
     window.RevealIframeSyncAPI.setRole('student');
   });
+  await waitForStudentRole(page);
 
   await sendCommand(page, 'setStudentBoundary', {
     indices: { h: 1, v: 0, f: 0 },
     releaseStartH: 0,
   });
+  await waitForStudentBoundary(page, 1);
 
-  await sendCommand(page, 'setState', {
-    state: { indexh: 1, indexv: 0, indexf: 0 },
+  await page.evaluate(() => {
+    window.Reveal.slide(1, 0, 0);
   });
 
-  await sendCommand(page, 'setState', {
-    state: { indexh: 1, indexv: 0, indexf: 0 },
-  });
-
-  await page.waitForFunction(() => {
-    const status = window.RevealIframeSyncAPI.getStatus();
-    return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
-  });
+  await page.waitForFunction(
+    () => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
+    },
+    undefined,
+    { polling: 50 },
+  );
 
   await page.evaluate(() => {
     window.Reveal.slide(3, 0, -1);

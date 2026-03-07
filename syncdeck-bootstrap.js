@@ -80,9 +80,13 @@
     return merged;
   }
 
-  async function runAfterInit(callback, revealGlobal) {
+  function runAfterInit(callback, revealGlobal) {
     try {
-      return await Promise.resolve(callback(revealGlobal));
+      return Promise.resolve(callback(revealGlobal)).catch(function (error) {
+        if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
+          global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
+        }
+      });
     } catch (error) {
       if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
         global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);

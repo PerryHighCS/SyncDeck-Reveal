@@ -177,18 +177,26 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     await waitForStudentRole(page);
 
     await sendCommand(page, 'clearBoundary', {}, 'manual-regression-lab');
-    await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary === null);
+    await page.waitForFunction(
+      () => window.RevealIframeSyncAPI.getStatus().studentBoundary === null,
+      undefined,
+      { polling: 50 },
+    );
 
     await sendCommand(page, 'setState', {
       state: { indexh: 4, indexv: 1, indexf: 2 },
     }, 'manual-regression-lab');
 
-    await page.waitForFunction(() => {
-      const status = window.RevealIframeSyncAPI.getStatus();
-      return status.indices.h === 4
-        && status.indices.v === 1
-        && status.indices.f === 2;
-    });
+    await page.waitForFunction(
+      () => {
+        const status = window.RevealIframeSyncAPI.getStatus();
+        return status.indices.h === 4
+          && status.indices.v === 1
+          && status.indices.f === 2;
+      },
+      undefined,
+      { polling: 50 },
+    );
 
     const lowerSlideMetrics = await page.evaluate(() => {
       const slide = document.querySelector('.slides > section:nth-of-type(5) > section:nth-of-type(2)');
