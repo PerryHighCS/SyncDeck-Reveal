@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file applies to the `vendor/SyncDeck-Reveal/js/` submodule.
+This file applies to the `vendor/SyncDeck-Reveal/` submodule.
 
 ## Scope
 

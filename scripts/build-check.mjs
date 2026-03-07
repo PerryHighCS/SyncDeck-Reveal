@@ -37,7 +37,7 @@ async function main() {
     ]);
 
     if (!generatedJs.equals(expectedJs) || !generatedCss.equals(expectedCss)) {
-      throw new Error('Committed dist artifacts are out of date. Run npm run build in vendor/SyncDeck-Reveal/js.');
+      throw new Error('Committed dist artifacts are out of date. Run npm run build in vendor/SyncDeck-Reveal.');
     }
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
