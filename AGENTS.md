@@ -1,11 +1,13 @@
 # AGENTS.md
 
-This file applies to the `vendor/SyncDeck-Reveal/js/` submodule.
+This file applies to the `vendor/SyncDeck-Reveal/` submodule.
 
 ## Scope
 
-- Runtime files here are plain IIFE scripts. Do not introduce a production build
-  step just to support tests.
+- Runtime source files here remain plain JS, but the public integration asset
+  is the bundled `dist/syncdeck-reveal.js` plus `dist/syncdeck-reveal.css`.
+  Keep source files directly loadable for tests and debugging, and keep bundle
+  ownership in this submodule.
 - Shared runtime behavior lives primarily in `reveal-iframe-sync.js`,
   `reveal-storyboard.js`, and the vendored `chalkboard/` integration points.
 - `TESTING_PLAN.md` may exist as a temporary implementation plan while the test
@@ -76,8 +78,8 @@ This file applies to the `vendor/SyncDeck-Reveal/js/` submodule.
 ## Guardrails
 
 - Keep test tooling isolated from runtime code. Tests may add fixtures and
-  runner infrastructure, but production scripts should remain directly loadable
-  without bundling.
+  runner infrastructure, but production source scripts should remain directly
+  loadable without bundling.
 - Do not weaken navigation or storyboard assertions to make tests pass.
 - Do not replace the vendored chalkboard copy with a CDN version.
 - Do not enable `chalkboard.storage`; the host remains the source of truth for

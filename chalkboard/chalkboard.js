@@ -64,10 +64,18 @@ function scriptPath() {
 	if ( document.currentScript ) {
 		src = document.currentScript.src;
 	} else {
-		var sel = document.querySelector( 'script[src$="/chalkboard/plugin.js"]' )
-		if ( sel ) {
-			src = sel.src;
+		var bundleSel = document.querySelector( 'script[src$="/dist/syncdeck-reveal.js"], script[src$="dist/syncdeck-reveal.js"]' );
+		if ( bundleSel ) {
+			src = bundleSel.src;
+		} else {
+			var sel = document.querySelector( 'script[src$="/chalkboard/chalkboard.js"], script[src$="chalkboard/chalkboard.js"], script[src$="/chalkboard/plugin.js"]' );
+			if ( sel ) {
+				src = sel.src;
+			}
 		}
+	}
+	if ( src && /\/dist\/syncdeck-reveal\.js(?:[?#].*)?$/.test( src ) ) {
+		return src.replace( /\/dist\/syncdeck-reveal\.js(?:[?#].*)?$/, '/chalkboard/' );
 	}
 	var path = ( src === undefined ) ? "" : src.slice( 0, src.lastIndexOf( "/" ) + 1 );
 //console.log("Path: " + path);

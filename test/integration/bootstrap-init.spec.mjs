@@ -7,6 +7,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(__dirname, '../fixtures/bootstrap-harness.html');
 const fixtureUrl = pathToFileURL(fixturePath);
 
+test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const globals = await page.evaluate(() => ({
+    revealLoaded: typeof window.Reveal?.initialize === 'function',
+    revealNotesId: window.RevealNotes?.id ?? null,
+    chalkboardId: window.RevealChalkboard?.id ?? null,
+    iframeSyncId: window.RevealIframeSync?.id ?? null,
+    storyboardInitType: typeof window.initRevealStoryboard,
+    bootstrapInitType: typeof window.initSyncDeckReveal,
+  }));
+
+  expect(globals.revealLoaded).toBe(true);
+  expect(globals.revealNotesId).toBe('notes');
+  expect(globals.chalkboardId).toBe('RevealChalkboard');
+  expect(globals.iframeSyncId).toBe('RevealIframeSync');
+  expect(globals.storyboardInitType).toBe('function');
+  expect(globals.bootstrapInitType).toBe('function');
+});
+
 test('preserves custom plugins while appending required SyncDeck plugins', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
