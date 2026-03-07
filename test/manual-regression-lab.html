@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SyncDeck Manual Regression Lab</title>
 
-<link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/reveal.css">
-<link rel="stylesheet" href="../chalkboard/chalkboard.css">
+<link rel="stylesheet" href="../dist/syncdeck-reveal.css">
 
 <style>
 body,
@@ -1224,11 +1223,7 @@ body.storyboard-open > .reveal {
   <div id="storyboard-track" class="storyboard-track"></div>
 </div>
 
-<script src="https://unpkg.com/reveal.js@5.1.0/dist/reveal.js"></script>
-<script src="https://unpkg.com/reveal.js@5.1.0/plugin/notes/notes.js"></script>
-<script src="../chalkboard/chalkboard.js"></script>
-<script src="../reveal-storyboard.js"></script>
-<script src="../reveal-iframe-sync.js"></script>
+<script src="../dist/syncdeck-reveal.js"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 const sameOrigin = window.location.origin && window.location.origin !== 'null'
@@ -1240,45 +1235,19 @@ const allowedOrigins = (params.get('allowedOrigins') || hostOrigin)
   .map((value) => value.trim())
   .filter(Boolean);
 
-Reveal.initialize({
-  hash: true,
-  hashOneBasedIndex: true,
-  keyboard: true,
-  touch: true,
-  loop: false,
-  transition: 'fade',
-  transitionSpeed: 'fast',
-  backgroundTransition: 'none',
-  center: false,
-  controls: true,
-  controlsLayout: 'edges',
-  progress: true,
-  slideNumber: 'c/t',
-  width: 1600,
-  height: 900,
-  margin: 0.04,
-  minScale: 0.2,
-  maxScale: 2.5,
-  fragments: true,
-  fragmentInURL: false,
-  iframeSync: {
-    deckId: 'manual-regression-lab',
+initSyncDeckReveal({
+  deckId: 'manual-regression-lab',
+  iframeSyncOverrides: {
     hostOrigin,
     allowedOrigins,
     studentCanNavigateBack: true,
     studentCanNavigateForward: false,
   },
-  plugins: [RevealNotes, RevealChalkboard, RevealIframeSync].filter(Boolean),
+  revealOverrides: {
+    loop: false,
+    fragmentInURL: false,
+  },
 });
-
-if (window.initRevealStoryboard) {
-  window.initRevealStoryboard({
-    reveal: Reveal,
-    storyboardId: 'storyboard',
-    trackId: 'storyboard-track',
-    toggleKey: 'm',
-  });
-}
 
 const storyboard = document.getElementById('storyboard');
 const storyboardTrack = document.getElementById('storyboard-track');

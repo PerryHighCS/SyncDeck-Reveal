@@ -26,7 +26,21 @@ export default [
     },
   },
   {
-    files: ['test/**/*.mjs'],
+    files: ['src/**/*.js'],
+    ...js.configs.recommended,
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    files: ['rollup.config.mjs', 'scripts/**/*.mjs', 'test/**/*.mjs'],
     ...js.configs.recommended,
     languageOptions: {
       ecmaVersion: 'latest',
