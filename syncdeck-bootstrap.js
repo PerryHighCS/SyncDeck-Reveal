@@ -91,6 +91,7 @@
       if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
         global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
       }
+      return Promise.resolve();
     }
   }
 

@@ -8,7 +8,7 @@
     "test:headed": "node scripts/run-playwright.mjs --headed",
     "build": "node scripts/build-runtime.mjs",
     "build:check": "node scripts/build-check.mjs",
-    "ship": "npm run test && npm run build && npm run build:check"
+    "ship": "npm run test && npm run build:check && npm run build"
   },
   "dependencies": {
     "reveal.js": "5.1.0"

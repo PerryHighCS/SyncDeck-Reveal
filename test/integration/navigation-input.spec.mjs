@@ -1322,6 +1322,10 @@ test('student direct API bypass snaps back to explicit boundary and exact pullba
   });
   await waitForStudentBoundary(page, 1);
 
+  await sendCommand(page, 'setState', {
+    state: { indexh: 1, indexv: 0, indexf: 0 },
+  });
+
   await page.evaluate(() => {
     window.Reveal.slide(1, 0, 0);
   });
