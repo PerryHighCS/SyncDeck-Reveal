@@ -17,6 +17,17 @@ async function waitForStudentRole(page) {
   );
 }
 
+async function waitForStudentBoundary(page, h) {
+  await page.waitForFunction(
+    ({ boundaryH }) => {
+      const status = window.RevealIframeSyncAPI.getStatus();
+      return status.studentBoundary?.h === boundaryH;
+    },
+    { boundaryH: h },
+    { polling: 50 },
+  );
+}
+
 test.describe('manual regression lab storyboard thumbnails', () => {
   let server;
 
@@ -206,12 +217,11 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     });
     await waitForStudentRole(page);
 
-    await sendCommand(page, 'clearBoundary', {}, 'manual-regression-lab');
-    await page.waitForFunction(
-      () => window.RevealIframeSyncAPI.getStatus().studentBoundary === null,
-      undefined,
-      { polling: 50 },
-    );
+    await sendCommand(page, 'setStudentBoundary', {
+      indices: { h: 4, v: 0, f: 0 },
+      releaseStartH: 0,
+    }, 'manual-regression-lab');
+    await waitForStudentBoundary(page, 4);
 
     await sendCommand(page, 'setState', {
       state: { indexh: 4, indexv: 1, indexf: 2 },

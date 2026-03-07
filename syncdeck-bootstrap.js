@@ -82,18 +82,11 @@
 
   async function runAfterInit(callback, revealGlobal) {
     try {
-      try {
-        return await Promise.resolve(callback(revealGlobal));
-      } catch (error) {
-        if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
-          global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
-        }
-      }
+      return await Promise.resolve(callback(revealGlobal));
     } catch (error) {
       if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
         global.console.error('[syncdeck-bootstrap] afterInit callback failed:', error);
       }
-      return Promise.resolve();
     }
   }
 
