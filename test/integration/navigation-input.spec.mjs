@@ -1176,8 +1176,8 @@ test('explicit horizontal release ranges reveal all fragments on flat slides ins
   });
   await waitForStudentBoundary(page, 3);
 
-  await sendCommand(page, 'setState', {
-    state: { indexh: 2, indexv: 0, indexf: -1 },
+  await page.evaluate(() => {
+    window.Reveal.slide(2, 0, -1);
   });
 
   await page.waitForFunction(

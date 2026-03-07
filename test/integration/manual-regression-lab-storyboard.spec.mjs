@@ -235,10 +235,6 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     }, undefined, { polling: 50 });
 
     await sendCommand(page, 'setState', {
-      state: { indexh: 4, indexv: 1, indexf: 2 },
-    }, 'manual-regression-lab');
-
-    await sendCommand(page, 'setState', {
       state: { indexh: 4, indexv: 0, indexf: 0 },
     }, 'manual-regression-lab');
 
