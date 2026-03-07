@@ -24,6 +24,7 @@ async function latestDeckConfig(page) {
 async function waitForStudentRole(page) {
   await page.waitForFunction(
     () => window.RevealIframeSyncAPI.getStatus().role === 'student',
+    undefined,
     { polling: 50 },
   );
 }
@@ -361,6 +362,7 @@ test('student stays on a lower stack child when instructor next advances the top
   await sendCommand(page, 'clearBoundary');
   await page.waitForFunction(
     () => window.RevealIframeSyncAPI.getStatus().studentBoundary === null,
+    undefined,
     { polling: 50 },
   );
 
@@ -376,6 +378,7 @@ test('student stays on a lower stack child when instructor next advances the top
         && status.indices.f === -1
         && status.studentBoundary?.h === 1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -391,6 +394,7 @@ test('student stays on a lower stack child when instructor next advances the top
         && status.indices.f === -1
         && status.studentBoundary?.h === 1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -404,6 +408,7 @@ test('student stays on a lower stack child when instructor next advances the top
         && status.indices.f === -1
         && status.studentBoundary?.h === 1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -906,6 +911,7 @@ test('student keeps local stack position when instructor moves within the same r
 
   await page.waitForFunction(
     () => window.RevealIframeSyncAPI.getStatus().studentBoundary === null,
+    undefined,
     { polling: 50 },
   );
 
@@ -921,6 +927,7 @@ test('student keeps local stack position when instructor moves within the same r
         && status.indices.f === -1
         && status.studentBoundary?.h === 1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -936,6 +943,7 @@ test('student keeps local stack position when instructor moves within the same r
         && status.indices.f === -1
         && status.studentBoundary?.h === 1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -1180,6 +1188,7 @@ test('explicit horizontal release ranges reveal all fragments on flat slides ins
         && status.indices.f === 2
         && status.navigation.canGoForward === true;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -2325,6 +2334,7 @@ test('up/down control buttons stay vertical and do not consume fragments', async
         && status.indices.f === 0
         && status.navigation.canGoDown === true;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -2337,6 +2347,7 @@ test('up/down control buttons stay vertical and do not consume fragments', async
         && status.indices.v === 1
         && status.indices.f === -1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -2349,6 +2360,7 @@ test('up/down control buttons stay vertical and do not consume fragments', async
         && status.indices.v === 0
         && status.indices.f === 0;
     },
+    undefined,
     { polling: 50 },
   );
 });
@@ -2511,6 +2523,7 @@ test('student touch swipe uses top-slide fragments within the boundary and block
       const status = window.RevealIframeSyncAPI.getStatus();
       return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === -1;
     },
+    undefined,
     { polling: 50 },
   );
 
@@ -2567,8 +2580,11 @@ test('student touch swipe uses top-slide fragments within the boundary and block
       const status = window.RevealIframeSyncAPI.getStatus();
       return status.indices.h === 1 && status.indices.v === 0 && status.indices.f === 0;
     },
+    undefined,
     { polling: 50 },
   );
+  expect(swipe.prevented).toBe(true);
+  expect(swipe.moveDefaultPrevented).toBe(true);
 
   swipe = await swipeLeft();
   await page.waitForFunction(
@@ -2578,6 +2594,7 @@ test('student touch swipe uses top-slide fragments within the boundary and block
         && status.indices.v === 0
         && status.indices.f === 0;
     },
+    undefined,
     { polling: 50 },
   );
 
