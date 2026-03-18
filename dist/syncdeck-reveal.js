@@ -2878,6 +2878,81 @@
 	    return childSlides[Math.max(0, Math.min(childSlides.length - 1, Number(current.v)))] || null;
 	  }
 
+	  function parseActivityOptions(rawOptions) {
+	    if (typeof rawOptions !== 'string' || rawOptions.trim() === '') {
+	      return {};
+	    }
+
+	    try {
+	      const parsed = JSON.parse(rawOptions);
+	      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+	        return {};
+	      }
+	      return parsed;
+	    } catch {
+	      return {};
+	    }
+	  }
+
+	  function buildActivityRequestPayload(slide, indices) {
+	    if (!(slide instanceof Element)) return null;
+
+	    const activityId = slide.getAttribute('data-activity-id');
+	    if (typeof activityId !== 'string' || activityId.trim() === '') {
+	      return null;
+	    }
+
+	    const resolvedIndices = normalizeIndices(indices);
+	    return {
+	      activityId: activityId.trim(),
+	      indices: resolvedIndices,
+	      instanceKey: `${activityId.trim()}:${resolvedIndices.h}:${resolvedIndices.v}`,
+	      activityOptions: parseActivityOptions(slide.getAttribute('data-activity-options')),
+	      trigger: slide.getAttribute('data-activity-trigger') || 'slide-enter',
+	    };
+	  }
+
+	  function getActivityRequestForCurrentSlide(ctx) {
+	    const currentIndices = normalizeIndices(ctx.deck.getIndices());
+	    const currentSlide = ctx.deck.getCurrentSlide?.() || getSlideElement(currentIndices);
+	    const primaryRequest = buildActivityRequestPayload(currentSlide, currentIndices);
+	    if (!primaryRequest) return null;
+
+	    const topLevelSlides = document.querySelectorAll('.reveal .slides > section');
+	    const topLevelSlide = topLevelSlides[currentIndices.h];
+	    const childSlides = Array.from(topLevelSlide?.querySelectorAll(':scope > section') || []);
+	    if (!childSlides.length) {
+	      return primaryRequest;
+	    }
+
+	    const stackRequests = childSlides
+	      .map((slide, childIndex) => buildActivityRequestPayload(slide, {
+	        h: currentIndices.h,
+	        v: childIndex,
+	        f: childIndex === currentIndices.v ? currentIndices.f : -1,
+	      }))
+	      .filter((request) => request && request.instanceKey !== primaryRequest.instanceKey);
+
+	    if (!stackRequests.length) {
+	      return primaryRequest;
+	    }
+
+	    return {
+	      ...primaryRequest,
+	      stackRequests,
+	    };
+	  }
+
+	  function emitActivityRequestForCurrentSlide(ctx) {
+	    if (ctx.state.role === 'student') return false;
+
+	    const payload = getActivityRequestForCurrentSlide(ctx);
+	    if (!payload) return false;
+
+	    safePostToParent(ctx, 'activityRequest', payload);
+	    return true;
+	  }
+
 	  function getTopLevelSlideCount() {
 	    return document.querySelectorAll('.reveal .slides > section').length;
 	  }
@@ -4247,6 +4322,7 @@
 	            updateNavigationControls(ctx);
 	            safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
 	            announceReady(ctx, 'roleChanged');
+	            emitActivityRequestForCurrentSlide(ctx);
 	            if (ctx.state.role === 'instructor') {
 	              // Broadcast the current drawing state immediately so the host can
 	              // relay it to all students. Covers both first load and reloads —
@@ -4384,6 +4460,10 @@
 	      safePostToParent(ctx, 'state', buildSyncStatusPayload(ctx, 'stateChanged'));
 	    };
 
+	    const emitActivityRequest = () => {
+	      emitActivityRequestForCurrentSlide(ctx);
+	    };
+
 	    const enforcePauseLock = () => {
 	      if (ctx.state.applyingRemote) return;
 	      if (ctx.state.role !== 'student') return;
@@ -4417,6 +4497,7 @@
 	    };
 
 	    deck.on('slidechanged', emitState);
+	    deck.on('slidechanged', emitActivityRequest);
 	    deck.on('slidechanged', flushChalkboardState);
 	    deck.on('fragmentshown', emitState);
 	    deck.on('fragmenthidden', emitState);
@@ -4660,6 +4741,7 @@
 	      deck.off('fragmentshown', enforceStudentBounds);
 	      deck.off('fragmenthidden', enforceStudentBounds);
 	      deck.off('slidechanged', emitState);
+	      deck.off('slidechanged', emitActivityRequest);
 	      deck.off('slidechanged', flushChalkboardState);
 	      deck.off('fragmentshown', emitState);
 	      deck.off('fragmenthidden', emitState);
@@ -4778,6 +4860,7 @@
 	          updateNavigationControls(ctx);
 	          safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
 	          announceReady(ctx, 'apiSetRole');
+	          emitActivityRequestForCurrentSlide(ctx);
 	        }
 	      },
 	      sendState: () => safePostToParent(ctx, 'state', currentDeckState(deck)),

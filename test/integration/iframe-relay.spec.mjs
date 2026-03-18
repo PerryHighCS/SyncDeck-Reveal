@@ -115,6 +115,58 @@ test.describe('iframe host relay behavior', () => {
     expect(response.data.payload.releasedRegion).toEqual({ startH: 0, endH: 1 });
   });
 
+  test('host receives activityRequest for an activity-anchored flat slide', async ({ page }) => {
+    await gotoHost(page);
+
+    await postCommand(page, 'setRole', { role: 'instructor' });
+    await clearHostMessages(page);
+
+    await postCommand(page, 'slide', { h: 2, v: 0, f: 0 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityRequest'));
+
+    const messages = await hostMessages(page);
+    const activityRequest = findMessage(messages, 'activityRequest');
+    expect(activityRequest?.data?.role).toBe('instructor');
+    expect(activityRequest?.data?.payload).toEqual({
+      activityId: 'quiz-check',
+      indices: { h: 2, v: 0, f: 0 },
+      instanceKey: 'quiz-check:2:0',
+      activityOptions: { attempt: 'warmup' },
+      trigger: 'slide-enter',
+    });
+  });
+
+  test('host receives stack activityRequest payloads for vertical activity slides', async ({ page }) => {
+    await gotoHost(page);
+
+    await postCommand(page, 'setRole', { role: 'instructor' });
+    await clearHostMessages(page);
+
+    await postCommand(page, 'slide', { h: 1, v: 0, f: -1 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityRequest'));
+
+    const messages = await hostMessages(page);
+    const activityRequest = findMessage(messages, 'activityRequest');
+    expect(activityRequest?.data?.payload).toEqual({
+      activityId: 'video-sync',
+      indices: { h: 1, v: 0, f: -1 },
+      instanceKey: 'video-sync:1:0',
+      activityOptions: { mode: 'conversion-smoke' },
+      trigger: 'slide-enter',
+      stackRequests: [
+        {
+          activityId: 'raffle',
+          indices: { h: 1, v: 1, f: -1 },
+          instanceKey: 'raffle:1:1',
+          activityOptions: { cohort: 'b' },
+          trigger: 'slide-enter',
+        },
+      ],
+    });
+  });
+
   test('syncToInstructor snaps student to supplied state and restores follow-instructor mode', async ({ page }) => {
     await gotoHost(page);
 
