@@ -51,20 +51,20 @@ jobs:
               shutil.rmtree(site)
           site.mkdir()
 
-            manifest = root / '.pages-manifest'
-            for line_number, raw_line in enumerate(manifest.read_text().splitlines(), start=1):
+          manifest = root / '.pages-manifest'
+          for line_number, raw_line in enumerate(manifest.read_text().splitlines(), start=1):
               line = raw_line.strip()
               if not line or line.startswith('#'):
                   continue
               parts = line.split(None, 1)
               if len(parts) != 2:
-                raise SystemExit(
-                  f"ERROR: invalid manifest directive on line {line_number}: {raw_line!r}"
-                )
+                  raise SystemExit(
+                      f"ERROR: invalid manifest directive on line {line_number}: {raw_line!r}"
+                  )
               if parts[0] != 'include':
-                raise SystemExit(
-                  f"ERROR: unknown manifest directive '{parts[0]}' on line {line_number}"
-                )
+                  raise SystemExit(
+                      f"ERROR: unknown manifest directive '{parts[0]}' on line {line_number}"
+                  )
               pattern = parts[1].strip()
               src = root / pattern
               if src.is_dir():
