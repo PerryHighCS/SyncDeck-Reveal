@@ -2005,6 +2005,43 @@ test('instructor role keeps Reveal keyboard enabled for unrestricted shortcuts',
   expect(config.keyboard).toBe(true);
 });
 
+test('standalone role via API stays unrestricted and clears prior student boundary state', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('student');
+  });
+
+  await sendCommand(page, 'setStudentBoundary', {
+    indices: { h: 2, v: 0, f: -1 },
+    releaseStartH: 0,
+  });
+
+  await page.waitForFunction(() => window.RevealIframeSyncAPI.getStatus().studentBoundary?.h === 2);
+
+  await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('standalone');
+  });
+
+  await page.waitForFunction(() => {
+    const status = window.RevealIframeSyncAPI.getStatus();
+    return status.role === 'standalone'
+      && status.studentBoundary === null
+      && status.capabilities.canNavigateBack === true
+      && status.capabilities.canNavigateForward === true;
+  });
+
+  const status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.role).toBe('standalone');
+  expect(status.studentBoundary).toBeNull();
+
+  const config = await latestDeckConfig(page);
+  expect(config.keyboard).toBe(true);
+  expect(config.touch).toBe(true);
+  await expect(page.locator('.reveal .controls .navigate-right')).toHaveAttribute('aria-disabled', 'false');
+  await expect(page.locator('.reveal .controls .navigate-right')).toHaveAttribute('data-syncdeck-visible', 'true');
+});
+
 test('instructor pause shortcuts toggle paused state with b and p', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

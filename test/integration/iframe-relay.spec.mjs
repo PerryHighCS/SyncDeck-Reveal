@@ -115,6 +115,43 @@ test.describe('iframe host relay behavior', () => {
     expect(response.data.payload.releasedRegion).toEqual({ startH: 0, endH: 1 });
   });
 
+  test('host can promote a student deck into standalone solo mode', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+
+    await postCommand(page, 'setRole', { role: 'student' });
+    await postCommand(page, 'setStudentBoundary', {
+      indices: { h: 2, v: 0, f: -1 },
+      releaseStartH: 0,
+    });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      return status?.role === 'student' && status?.studentBoundary?.h === 2;
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'standalone' });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      return status?.role === 'standalone'
+        && status?.studentBoundary === null
+        && status?.capabilities?.canNavigateBack === true
+        && status?.capabilities?.canNavigateForward === true;
+    });
+
+    const messages = await hostMessages(page);
+    const roleChanged = findMessage(messages, 'roleChanged');
+    const ready = findMessage(messages, 'ready');
+    expect(roleChanged?.data?.payload).toEqual({ role: 'standalone' });
+    expect(ready?.data?.payload?.role).toBe('standalone');
+    expect(ready?.data?.payload?.reason).toBe('roleChanged');
+  });
+
   test('host receives activityRequest for an activity-anchored flat slide', async ({ page }) => {
     await gotoHost(page);
 
