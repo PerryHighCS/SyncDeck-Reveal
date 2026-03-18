@@ -3,6 +3,9 @@
 
 exclude test/
 include test/manual-regression-lab.html
+exclude src/
+exclude scripts/
+exclude rollup.config.mjs
 exclude coverage/
 exclude node_modules/
 exclude playwright-report/
