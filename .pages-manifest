@@ -1,9 +1,8 @@
 # Paths are relative to this file's directory.
+# 'exclude' rules are applied first; 'include' lines are copied explicitly afterward.
 
-exclude test/fixtures/
-exclude test/integration/
-exclude test/support/
-exclude test/MANUAL_REGRESSION_CHECKLIST.md
+exclude test/
+include test/manual-regression-lab.html
 exclude coverage/
 exclude node_modules/
 exclude playwright-report/

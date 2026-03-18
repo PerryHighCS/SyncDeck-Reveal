@@ -53,13 +53,17 @@ jobs:
 
           manifest = root / '.pages-manifest'
           excludes = []
+          includes = []
           for line in manifest.read_text().splitlines():
               line = line.strip()
               if not line or line.startswith('#'):
                   continue
               parts = line.split(None, 1)
-              if len(parts) == 2 and parts[0] == 'exclude':
-                  excludes.append(parts[1].strip())
+              if len(parts) == 2:
+                  if parts[0] == 'exclude':
+                      excludes.append(parts[1].strip())
+                  elif parts[0] == 'include':
+                      includes.append(parts[1].strip())
 
           def is_excluded(rel_path):
               rel_str = rel_path.as_posix()
@@ -85,6 +89,17 @@ jobs:
               dest.parent.mkdir(parents=True, exist_ok=True)
               shutil.copy2(src, dest)
               print(f'  {rel}')
+
+          # Explicit includes override excludes
+          for pattern in includes:
+              src = root / pattern
+              if src.is_file():
+                  dest = site / pattern
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, dest)
+                  print(f'  {pattern} (include)')
+              else:
+                  print(f'  WARNING: include path not found: {pattern}')
           PY
 
       - name: Upload Pages artifact
