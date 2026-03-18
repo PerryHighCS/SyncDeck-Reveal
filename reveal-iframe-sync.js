@@ -243,6 +243,15 @@
     }
   }
 
+  function normalizeActivityTrigger(rawTrigger) {
+    if (typeof rawTrigger !== 'string') {
+      return 'slide-enter';
+    }
+
+    const trimmedTrigger = rawTrigger.trim();
+    return trimmedTrigger || 'slide-enter';
+  }
+
   function buildActivityRequestPayload(slide, indices) {
     if (!(slide instanceof Element)) return null;
 
@@ -257,7 +266,7 @@
       indices: resolvedIndices,
       instanceKey: `${activityId.trim()}:${resolvedIndices.h}:${resolvedIndices.v}`,
       activityOptions: parseActivityOptions(slide.getAttribute('data-activity-options')),
-      trigger: slide.getAttribute('data-activity-trigger') || 'slide-enter',
+      trigger: normalizeActivityTrigger(slide.getAttribute('data-activity-trigger')),
     };
   }
 

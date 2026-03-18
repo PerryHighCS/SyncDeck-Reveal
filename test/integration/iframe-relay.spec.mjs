@@ -167,6 +167,27 @@ test.describe('iframe host relay behavior', () => {
     });
   });
 
+  test('host defaults whitespace-only activity triggers to slide-enter', async ({ page }) => {
+    await gotoHost(page);
+
+    await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      const slide = frame?.contentDocument?.querySelector('.reveal .slides > section[data-activity-id="quiz-check"]');
+      slide?.setAttribute('data-activity-trigger', '   ');
+    });
+
+    await postCommand(page, 'setRole', { role: 'instructor' });
+    await clearHostMessages(page);
+
+    await postCommand(page, 'slide', { h: 2, v: 0, f: 0 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityRequest'));
+
+    const messages = await hostMessages(page);
+    const activityRequest = findMessage(messages, 'activityRequest');
+    expect(activityRequest?.data?.payload?.trigger).toBe('slide-enter');
+  });
+
   test('syncToInstructor snaps student to supplied state and restores follow-instructor mode', async ({ page }) => {
     await gotoHost(page);
 
