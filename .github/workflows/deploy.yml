@@ -51,14 +51,20 @@ jobs:
               shutil.rmtree(site)
           site.mkdir()
 
-          manifest = root / '.pages-manifest'
-          for line in manifest.read_text().splitlines():
-              line = line.strip()
+            manifest = root / '.pages-manifest'
+            for line_number, raw_line in enumerate(manifest.read_text().splitlines(), start=1):
+              line = raw_line.strip()
               if not line or line.startswith('#'):
                   continue
               parts = line.split(None, 1)
-              if len(parts) != 2 or parts[0] != 'include':
-                  continue
+              if len(parts) != 2:
+                raise SystemExit(
+                  f"ERROR: invalid manifest directive on line {line_number}: {raw_line!r}"
+                )
+              if parts[0] != 'include':
+                raise SystemExit(
+                  f"ERROR: unknown manifest directive '{parts[0]}' on line {line_number}"
+                )
               pattern = parts[1].strip()
               src = root / pattern
               if src.is_dir():
@@ -72,6 +78,22 @@ jobs:
               else:
                   raise SystemExit(f'ERROR: include path not found: {pattern}')
           PY
+
+      - name: Generate index.html
+        run: |
+          cat > _site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta http-equiv="refresh" content="0; url=test/manual-regression-lab.html">
+            <title>SyncDeck Reveal</title>
+          </head>
+          <body>
+            <p><a href="test/manual-regression-lab.html">Open manual regression lab</a></p>
+          </body>
+          </html>
+          HTML
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
