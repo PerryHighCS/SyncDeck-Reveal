@@ -19,17 +19,27 @@
         <p>Fixture slide one.</p>
       </section>
       <section>
-        <section>
+        <section
+          data-activity-id="video-sync"
+          data-activity-trigger="slide-enter"
+          data-activity-options='{"mode":"conversion-smoke"}'
+        >
           <h2>Concept Stack</h2>
           <p>First child in a vertical stack.</p>
           <p class="fragment">A fragment inside the first child.</p>
         </section>
-        <section>
+        <section
+          data-activity-id="raffle"
+          data-activity-options='{"cohort":"b"}'
+        >
           <h2>Concept Detail</h2>
           <p>Second child in a vertical stack.</p>
         </section>
       </section>
-      <section>
+      <section
+        data-activity-id="quiz-check"
+        data-activity-options='{"attempt":"warmup"}'
+      >
         <h2>Third</h2>
         <p>Fixture slide three.</p>
         <p class="fragment">First gated fragment on a flat slide.</p>
