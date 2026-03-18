@@ -52,54 +52,25 @@ jobs:
           site.mkdir()
 
           manifest = root / '.pages-manifest'
-          excludes = []
-          includes = []
           for line in manifest.read_text().splitlines():
               line = line.strip()
               if not line or line.startswith('#'):
                   continue
               parts = line.split(None, 1)
-              if len(parts) == 2:
-                  if parts[0] == 'exclude':
-                      excludes.append(parts[1].strip())
-                  elif parts[0] == 'include':
-                      includes.append(parts[1].strip())
-
-          def is_excluded(rel_path):
-              rel_str = rel_path.as_posix()
-              for pattern in excludes:
-                  if pattern.endswith('/'):
-                      prefix = pattern.rstrip('/')
-                      if rel_str == prefix or rel_str.startswith(prefix + '/'):
-                          return True
-                  else:
-                      if rel_str == pattern:
-                          return True
-              return False
-
-          for src in sorted(root.rglob('*')):
-              if not src.is_file():
+              if len(parts) != 2 or parts[0] != 'include':
                   continue
-              rel = src.relative_to(root)
-              if any(part.startswith('.') for part in rel.parts):
-                  continue
-              if is_excluded(rel):
-                  continue
-              dest = site / rel
-              dest.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(src, dest)
-              print(f'  {rel}')
-
-          # Explicit includes override excludes
-          for pattern in includes:
+              pattern = parts[1].strip()
               src = root / pattern
-              if src.is_file():
+              if src.is_dir():
+                  shutil.copytree(src, site / pattern, dirs_exist_ok=True)
+                  print(f'  {pattern}/')
+              elif src.is_file():
                   dest = site / pattern
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copy2(src, dest)
-                  print(f'  {pattern} (include)')
+                  print(f'  {pattern}')
               else:
-                  print(f'  WARNING: include path not found: {pattern}')
+                  raise SystemExit(f'ERROR: include path not found: {pattern}')
           PY
 
       - name: Upload Pages artifact

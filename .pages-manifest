@@ -1,24 +1,5 @@
 # Paths are relative to this file's directory.
-# 'exclude' rules are applied first; 'include' lines are copied explicitly afterward.
+# Only 'include' lines are copied to the Pages site (files or directories).
 
-exclude test/
+include dist/
 include test/manual-regression-lab.html
-exclude src/
-exclude scripts/
-exclude rollup.config.mjs
-exclude coverage/
-exclude node_modules/
-exclude playwright-report/
-exclude .github/
-exclude .gitignore
-exclude eslint.config.mjs
-exclude package.json
-exclude package-lock.json
-exclude vitest.config.js
-exclude vitest.config.mjs
-exclude playwright.config.js
-exclude playwright.config.mjs
-exclude test-results/
-exclude AGENTS.md
-exclude TESTING_PLAN.md
-exclude .pages-manifest
