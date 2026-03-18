@@ -1,0 +1,115 @@
+name: Build and Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deployment
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runtime
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble site from .pages-manifest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          root = Path('.').resolve()
+          site = root / '_site'
+
+          if site.exists():
+              shutil.rmtree(site)
+          site.mkdir()
+
+          manifest = root / '.pages-manifest'
+          for line_number, raw_line in enumerate(manifest.read_text().splitlines(), start=1):
+              line = raw_line.strip()
+              if not line or line.startswith('#'):
+                  continue
+              parts = line.split(None, 1)
+              if len(parts) != 2:
+                  raise SystemExit(
+                      f"ERROR: invalid manifest directive on line {line_number}: {raw_line!r}"
+                  )
+              if parts[0] != 'include':
+                  raise SystemExit(
+                      f"ERROR: unknown manifest directive '{parts[0]}' on line {line_number}"
+                  )
+              pattern = parts[1].strip()
+              src = root / pattern
+              if src.is_dir():
+                  shutil.copytree(src, site / pattern, dirs_exist_ok=True)
+                  print(f'  {pattern}/')
+              elif src.is_file():
+                  dest = site / pattern
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, dest)
+                  print(f'  {pattern}')
+              else:
+                  raise SystemExit(f'ERROR: include path not found: {pattern}')
+          PY
+
+      - name: Generate index.html
+        run: |
+          cat > _site/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta http-equiv="refresh" content="0; url=test/manual-regression-lab.html">
+            <title>SyncDeck Reveal</title>
+          </head>
+          <body>
+            <p><a href="test/manual-regression-lab.html">Open manual regression lab</a></p>
+          </body>
+          </html>
+          HTML
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
