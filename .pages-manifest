@@ -2,4 +2,5 @@
 # Only 'include' lines are copied to the Pages site (files or directories).
 
 include dist/
+include chalkboard/
 include test/manual-regression-lab.html
