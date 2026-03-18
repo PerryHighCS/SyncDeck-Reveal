@@ -1,6 +1,9 @@
 # Paths are relative to this file's directory.
 
-exclude test/
+exclude test/fixtures/
+exclude test/integration/
+exclude test/support/
+exclude test/MANUAL_REGRESSION_CHECKLIST.md
 exclude coverage/
 exclude node_modules/
 exclude playwright-report/

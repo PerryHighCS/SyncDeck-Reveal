@@ -1,0 +1,105 @@
+name: Build and Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deployment
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build runtime
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Assemble site from .pages-manifest
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          root = Path('.').resolve()
+          site = root / '_site'
+
+          if site.exists():
+              shutil.rmtree(site)
+          site.mkdir()
+
+          manifest = root / '.pages-manifest'
+          excludes = []
+          for line in manifest.read_text().splitlines():
+              line = line.strip()
+              if not line or line.startswith('#'):
+                  continue
+              parts = line.split(None, 1)
+              if len(parts) == 2 and parts[0] == 'exclude':
+                  excludes.append(parts[1].strip())
+
+          def is_excluded(rel_path):
+              rel_str = rel_path.as_posix()
+              for pattern in excludes:
+                  if pattern.endswith('/'):
+                      prefix = pattern.rstrip('/')
+                      if rel_str == prefix or rel_str.startswith(prefix + '/'):
+                          return True
+                  else:
+                      if rel_str == pattern:
+                          return True
+              return False
+
+          for src in sorted(root.rglob('*')):
+              if not src.is_file():
+                  continue
+              rel = src.relative_to(root)
+              if any(part.startswith('.') for part in rel.parts):
+                  continue
+              if is_excluded(rel):
+                  continue
+              dest = site / rel
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(src, dest)
+              print(f'  {rel}')
+          PY
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
