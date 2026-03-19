@@ -10,12 +10,16 @@
  * Reveal.initialize({
  *   plugins: [ RevealChalkboard, RevealIframeSync ].filter(Boolean),
  *   iframeSync: {
- *     role: 'student',              // 'student' | 'instructor' | 'standalone'
  *     deckId: '2d-arrays',          // optional logical deck id
  *     hostOrigin: '*',              // recommended: exact host origin in production
  *     allowedOrigins: ['*'],        // origins accepted for inbound commands
  *   }
  * });
+ *
+ * Role note:
+ * The plugin always starts in 'standalone' mode until a host message or
+ * RevealIframeSyncAPI.setRole(...) explicitly promotes it to 'student' or
+ * 'instructor'. This avoids exposing managed-role UI in unmanaged contexts.
  * </script>
  */
 
@@ -24,7 +28,6 @@
   const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
 
   const DEFAULTS = {
-    role: 'student',
     deckId: null,
     hostOrigin: '*',
     allowedOrigins: ['*'],
