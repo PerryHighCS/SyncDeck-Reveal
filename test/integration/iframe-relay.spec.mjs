@@ -115,6 +115,43 @@ test.describe('iframe host relay behavior', () => {
     expect(response.data.payload.releasedRegion).toEqual({ startH: 0, endH: 1 });
   });
 
+  test('host can promote a student deck into standalone solo mode', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+
+    await postCommand(page, 'setRole', { role: 'student' });
+    await postCommand(page, 'setStudentBoundary', {
+      indices: { h: 2, v: 0, f: -1 },
+      releaseStartH: 0,
+    });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      return status?.role === 'student' && status?.studentBoundary?.h === 2;
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'standalone' });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      return status?.role === 'standalone'
+        && status?.studentBoundary === null
+        && status?.capabilities?.canNavigateBack === true
+        && status?.capabilities?.canNavigateForward === true;
+    });
+
+    const messages = await hostMessages(page);
+    const roleChanged = findMessage(messages, 'roleChanged');
+    const ready = findMessage(messages, 'ready');
+    expect(roleChanged?.data?.payload).toEqual({ role: 'standalone' });
+    expect(ready?.data?.payload?.role).toBe('standalone');
+    expect(ready?.data?.payload?.reason).toBe('roleChanged');
+  });
+
   test('host receives activityRequest for an activity-anchored flat slide', async ({ page }) => {
     await gotoHost(page);
 
@@ -517,6 +554,67 @@ test.describe('iframe host relay behavior', () => {
     messages = await hostMessages(page);
     const requestedState = findMessage(messages, 'chalkboardState');
     expect(requestedState.data.payload.storage).toEqual({ board: 'snapshot' });
+  });
+
+  test('student to standalone role transition restores chalkboard write access and broadcasts state', async ({ page }) => {
+    await page.addInitScript(() => {
+      const calls = [];
+      window.__chalkboardCalls = calls;
+      window.RevealChalkboard = {
+        configure(...args) {
+          calls.push({ method: 'configure', args });
+        },
+        getData() {
+          calls.push({ method: 'getData', args: [] });
+          return { board: 'standalone-snapshot' };
+        },
+      };
+    });
+
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => {
+      const calls = window.__hostHarness.frame.contentWindow?.__chalkboardCalls || [];
+      return calls.some((entry) => entry.method === 'configure');
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'standalone' });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      const calls = frame?.contentWindow?.__chalkboardCalls || [];
+      const messages = window.__hostHarness.getMessages();
+      return status?.role === 'standalone'
+        && calls.some((entry) => entry.method === 'configure' && entry.args?.[0]?.readOnly === false)
+        && calls.some((entry) => entry.method === 'getData')
+        && messages.some((entry) => entry.data?.action === 'chalkboardState');
+    });
+
+    const calls = await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      return frame?.contentWindow?.__chalkboardCalls || [];
+    });
+    expect(calls).toEqual([
+      { method: 'configure', args: [{ readOnly: true }] },
+      { method: 'configure', args: [{ readOnly: false }] },
+      { method: 'getData', args: [] },
+    ]);
+
+    const messages = await hostMessages(page);
+    const roleChanged = findMessage(messages, 'roleChanged');
+    const ready = findMessage(messages, 'ready');
+    const chalkboardState = findMessage(messages, 'chalkboardState');
+
+    expect(roleChanged?.data?.payload).toEqual({ role: 'standalone' });
+    expect(ready?.data?.payload?.role).toBe('standalone');
+    expect(ready?.data?.payload?.reason).toBe('roleChanged');
+    expect(chalkboardState?.data?.role).toBe('standalone');
+    expect(chalkboardState?.data?.payload?.storage).toEqual({ board: 'standalone-snapshot' });
   });
 
   test('host receives chalkboard erase strokes and slide-change snapshots from instructor iframe', async ({ page }) => {

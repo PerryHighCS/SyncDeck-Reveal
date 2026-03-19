@@ -10,12 +10,16 @@
  * Reveal.initialize({
  *   plugins: [ RevealChalkboard, RevealIframeSync ].filter(Boolean),
  *   iframeSync: {
- *     role: 'student',              // 'student' | 'instructor'
  *     deckId: '2d-arrays',          // optional logical deck id
  *     hostOrigin: '*',              // recommended: exact host origin in production
  *     allowedOrigins: ['*'],        // origins accepted for inbound commands
  *   }
  * });
+ *
+ * Role note:
+ * The plugin always starts in 'standalone' mode until a host message or
+ * RevealIframeSyncAPI.setRole(...) explicitly promotes it to 'student' or
+ * 'instructor'. This avoids exposing managed-role UI in unmanaged contexts.
  * </script>
  */
 
@@ -24,7 +28,6 @@
   const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
 
   const DEFAULTS = {
-    role: 'student',
     deckId: null,
     hostOrigin: '*',
     allowedOrigins: ['*'],
@@ -182,6 +185,72 @@
     return left.f - right.f;
   }
 
+  function isSupportedRole(role) {
+    return role === 'student' || role === 'instructor' || role === 'standalone';
+  }
+
+  function resetBoundaryState(ctx) {
+    ctx.state.studentMaxIndices = titleSlideBoundary();
+    ctx.state.hasExplicitBoundary = false;
+    ctx.state.boundaryIsLocal = false;
+    ctx.state.exactStudentMaxIndices = null;
+    ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
+    ctx.state.topSlideFragmentsByH = {};
+    ctx.state.releaseStartH = null;
+    ctx.state.releaseEndH = null;
+    window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
+      detail: { indices: getStudentBoundary(ctx) },
+    }));
+  }
+
+  function applyRoleChange(ctx, role, readyReason) {
+    if (!isSupportedRole(role)) return false;
+
+    if (ctx.state.standaloneControlRefreshTimer) {
+      clearTimeout(ctx.state.standaloneControlRefreshTimer);
+      ctx.state.standaloneControlRefreshTimer = null;
+    }
+
+    ctx.state.role = role;
+    ctx.state.pauseLockedByHost = false;
+    applyPauseLockUi(ctx);
+
+    if (ctx.state.role === 'student') {
+      // Reset boundary to title slide when demoting to student.
+      resetBoundaryState(ctx);
+      // Prevent student from drawing on the chalkboard canvas.
+      callChalkboard(ctx, 'configure', [{ readOnly: true }]);
+    } else if (ctx.state.role === 'standalone') {
+      // Solo mode should not retain host-controlled student boundaries.
+      resetBoundaryState(ctx);
+      // Standalone decks should regain full chalkboard control immediately.
+      callChalkboard(ctx, 'configure', [{ readOnly: false }]);
+    } else if (ctx.state.role === 'instructor') {
+      // Instructor role must also keep chalkboard input unrestricted.
+      callChalkboard(ctx, 'configure', [{ readOnly: false }]);
+    }
+
+    // Update navigation controls to reflect new role.
+    updateNavigationControls(ctx);
+    safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
+    announceReady(ctx, readyReason);
+    emitActivityRequestForCurrentSlide(ctx);
+
+    if (canBroadcastChalkboard(ctx)) {
+      // Broadcast the current drawing state immediately so the host can
+      // relay it onward when this role can author chalkboard state.
+      // Covers both first load and reloads —
+      // when sessionStorage is configured the plugin restores its drawings
+      // before setRole arrives, so downstream views get re-synced automatically.
+      const cbApi = chalkboardApi();
+      if (cbApi) {
+        safePostToParent(ctx, 'chalkboardState', { storage: cbApi.getData() });
+      }
+    }
+
+    return true;
+  }
+
   function getRoleCapabilities(ctx) {
     const isInstructor = ctx.state.role === 'instructor';
     const isStandalone = ctx.state.role === 'standalone';
@@ -189,6 +258,10 @@
       canNavigateBack: (isInstructor || isStandalone) ? true : !!ctx.config.studentCanNavigateBack,
       canNavigateForward: (isInstructor || isStandalone) ? true : !!ctx.config.studentCanNavigateForward,
     };
+  }
+
+  function canBroadcastChalkboard(ctx) {
+    return ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
   }
 
   function getStudentBoundary(ctx) {
@@ -1659,39 +1732,7 @@
           if (deck.isPaused?.()) deck.togglePause?.(false);
           break;
         case 'setRole':
-          if (payload.role === 'instructor' || payload.role === 'student') {
-            ctx.state.role = payload.role;
-            ctx.state.pauseLockedByHost = false;
-            applyPauseLockUi(ctx);
-            if (ctx.state.role === 'student') {
-              // Reset boundary to title slide when demoting to student.
-              ctx.state.studentMaxIndices = titleSlideBoundary();
-              ctx.state.hasExplicitBoundary = false;
-              ctx.state.boundaryIsLocal = false;
-              ctx.state.exactStudentMaxIndices = null;
-              ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
-              ctx.state.topSlideFragmentsByH = {};
-              ctx.state.releaseStartH = null;
-              ctx.state.releaseEndH = null;
-              // Prevent student from drawing on the chalkboard canvas.
-              callChalkboard(ctx, 'configure', [{ readOnly: true }]);
-            }
-            // Update navigation controls to reflect new role.
-            updateNavigationControls(ctx);
-            safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
-            announceReady(ctx, 'roleChanged');
-            emitActivityRequestForCurrentSlide(ctx);
-            if (ctx.state.role === 'instructor') {
-              // Broadcast the current drawing state immediately so the host can
-              // relay it to all students. Covers both first load and reloads —
-              // when sessionStorage is configured the plugin restores its drawings
-              // before setRole arrives, so students get re-synced automatically.
-              const cbApi = chalkboardApi();
-              if (cbApi) {
-                safePostToParent(ctx, 'chalkboardState', { storage: cbApi.getData() });
-              }
-            }
-          }
+          applyRoleChange(ctx, payload.role, 'roleChanged');
           break;
         case 'allowStudentForwardTo': {
           const target = payload.indices || payload;
@@ -1744,7 +1785,7 @@
           }
           break;
         case 'requestChalkboardState': {
-          // Host asks the instructor iframe for a full state snapshot.
+          // Host asks the active authoring iframe for a full state snapshot.
           const cbApi = chalkboardApi();
           if (cbApi) {
             safePostToParent(ctx, 'chalkboardState', { storage: cbApi.getData() });
@@ -1841,13 +1882,13 @@
       }
     };
 
-    // When the instructor changes slides, send a full chalkboard snapshot so
+    // When an authoring role changes slides, send a full chalkboard snapshot so
     // the host can replace its delta buffer with a clean checkpoint.
     // Using slidechanged only (not fragmentshown/hidden) — fragment moves
     // don't change the active drawing layer, so there is nothing to flush.
     const flushChalkboardState = () => {
       if (ctx.state.applyingRemote) return;
-      if (ctx.state.role !== 'instructor') return;
+      if (!canBroadcastChalkboard(ctx)) return;
       const cbApi = chalkboardApi();
       if (cbApi) {
         safePostToParent(ctx, 'chalkboardState', { storage: cbApi.getData() });
@@ -2054,13 +2095,13 @@
     window.addEventListener('reveal-storyboard-boundary-moved', onBoundaryMoved);
 
     // Relay chalkboard draw/erase events to the host so it can forward them
-    // to student iframes. Only relayed when this frame is the instructor.
+    // to downstream viewers. Only relayed when this frame can author state.
     // The plugin fires 'broadcast' CustomEvents on document; event.content
     // carries {sender, type:'draw'|'erase', mode, board, fromX/Y, toX/Y, color,
     // x, y, timestamp} — all coordinates are already in logical space
     // (divided by canvas scale) so students can replay them at any viewport size.
     const onChalkboardBroadcast = (event) => {
-      if (ctx.state.role !== 'instructor') return;
+      if (!canBroadcastChalkboard(ctx)) return;
       const c = event.content;
       if (!c || c.sender !== 'chalkboard-plugin') return;
       // Normalize f:-1 so strokes are stored under the same key that
@@ -2196,30 +2237,7 @@
       getCapabilities: () => getRoleCapabilities(ctx),
       getStatus: () => buildSyncStatusPayload(ctx, 'apiGetStatus'),
       setRole: (role) => {
-        if (role === 'instructor' || role === 'student') {
-          if (ctx.state.standaloneControlRefreshTimer) {
-            clearTimeout(ctx.state.standaloneControlRefreshTimer);
-            ctx.state.standaloneControlRefreshTimer = null;
-          }
-          ctx.state.role = role;
-          ctx.state.pauseLockedByHost = false;
-          applyPauseLockUi(ctx);
-          if (ctx.state.role === 'student') {
-            ctx.state.studentMaxIndices = titleSlideBoundary();
-            ctx.state.hasExplicitBoundary = false;
-            ctx.state.boundaryIsLocal = false;
-            ctx.state.exactStudentMaxIndices = null;
-            ctx.state.lastAllowedStudentIndices = titleSlideBoundary();
-            ctx.state.topSlideFragmentsByH = {};
-            ctx.state.releaseStartH = null;
-            ctx.state.releaseEndH = null;
-          }
-          // Update navigation controls to reflect new role.
-          updateNavigationControls(ctx);
-          safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
-          announceReady(ctx, 'apiSetRole');
-          emitActivityRequestForCurrentSlide(ctx);
-        }
+        applyRoleChange(ctx, role, 'apiSetRole');
       },
       sendState: () => safePostToParent(ctx, 'state', currentDeckState(deck)),
       sendCustom: (eventName, payload) => safePostToParent(ctx, eventName, payload || {}),
