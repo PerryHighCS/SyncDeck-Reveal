@@ -195,6 +195,9 @@
     ctx.state.topSlideFragmentsByH = {};
     ctx.state.releaseStartH = null;
     ctx.state.releaseEndH = null;
+    window.dispatchEvent(new CustomEvent('reveal-storyboard-boundary-update', {
+      detail: { indices: getStudentBoundary(ctx) },
+    }));
   }
 
   function applyRoleChange(ctx, role, readyReason) {

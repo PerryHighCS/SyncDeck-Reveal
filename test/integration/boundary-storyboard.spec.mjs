@@ -189,6 +189,17 @@ test('storyboard refreshes boundary controls correctly across role changes', asy
   expect(status.studentBoundary).toEqual({ h: 0, v: 0, f: -1 });
 
   await page.evaluate(() => {
+    window.RevealIframeSyncAPI.setRole('standalone');
+  });
+
+  await expect(page.locator('#storyboard-track .story-boundary-btn')).toHaveCount(0);
+  await expect(page.locator('#storyboard-track .story-thumb-boundary')).toHaveCount(0);
+
+  status = await page.evaluate(() => window.RevealIframeSyncAPI.getStatus());
+  expect(status.role).toBe('standalone');
+  expect(status.studentBoundary).toBeNull();
+
+  await page.evaluate(() => {
     window.RevealIframeSyncAPI.setRole('instructor');
   });
 
