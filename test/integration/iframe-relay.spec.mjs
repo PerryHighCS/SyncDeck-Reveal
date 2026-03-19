@@ -556,6 +556,67 @@ test.describe('iframe host relay behavior', () => {
     expect(requestedState.data.payload.storage).toEqual({ board: 'snapshot' });
   });
 
+  test('student to standalone role transition restores chalkboard write access and broadcasts state', async ({ page }) => {
+    await page.addInitScript(() => {
+      const calls = [];
+      window.__chalkboardCalls = calls;
+      window.RevealChalkboard = {
+        configure(...args) {
+          calls.push({ method: 'configure', args });
+        },
+        getData() {
+          calls.push({ method: 'getData', args: [] });
+          return { board: 'standalone-snapshot' };
+        },
+      };
+    });
+
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => {
+      const calls = window.__hostHarness.frame.contentWindow?.__chalkboardCalls || [];
+      return calls.some((entry) => entry.method === 'configure');
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'standalone' });
+
+    await page.waitForFunction(() => {
+      const frame = document.getElementById('deck-frame');
+      const status = frame?.contentWindow?.RevealIframeSyncAPI?.getStatus?.();
+      const calls = frame?.contentWindow?.__chalkboardCalls || [];
+      const messages = window.__hostHarness.getMessages();
+      return status?.role === 'standalone'
+        && calls.some((entry) => entry.method === 'configure' && entry.args?.[0]?.readOnly === false)
+        && calls.some((entry) => entry.method === 'getData')
+        && messages.some((entry) => entry.data?.action === 'chalkboardState');
+    });
+
+    const calls = await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      return frame?.contentWindow?.__chalkboardCalls || [];
+    });
+    expect(calls).toEqual([
+      { method: 'configure', args: [{ readOnly: true }] },
+      { method: 'configure', args: [{ readOnly: false }] },
+      { method: 'getData', args: [] },
+    ]);
+
+    const messages = await hostMessages(page);
+    const roleChanged = findMessage(messages, 'roleChanged');
+    const ready = findMessage(messages, 'ready');
+    const chalkboardState = findMessage(messages, 'chalkboardState');
+
+    expect(roleChanged?.data?.payload).toEqual({ role: 'standalone' });
+    expect(ready?.data?.payload?.role).toBe('standalone');
+    expect(ready?.data?.payload?.reason).toBe('roleChanged');
+    expect(chalkboardState?.data?.role).toBe('standalone');
+    expect(chalkboardState?.data?.payload?.storage).toEqual({ board: 'standalone-snapshot' });
+  });
+
   test('host receives chalkboard erase strokes and slide-change snapshots from instructor iframe', async ({ page }) => {
     await page.addInitScript(() => {
       const snapshots = [{ board: 'initial' }, { board: 'after-slide-change' }];
