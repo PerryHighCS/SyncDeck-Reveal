@@ -1,7 +1,7 @@
-import Reveal from 'reveal.js/dist/reveal.esm.js';
-import RevealNotes from 'reveal.js/plugin/notes/notes.esm.js';
+import Reveal from 'reveal.js';
+import RevealNotes from 'reveal.js/plugin/notes';
 
-import 'reveal.js/dist/reveal.css';
+import 'reveal.js/reveal.css';
 import '../chalkboard/chalkboard.css';
 // The chalkboard bundle registers RevealChalkboard on window as a side effect.
 import '../chalkboard/chalkboard.js';

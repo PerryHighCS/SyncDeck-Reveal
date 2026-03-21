@@ -11,7 +11,7 @@
     "ship": "npm run test && npm run build:check && npm run build"
   },
   "dependencies": {
-    "reveal.js": "5.1.0"
+    "reveal.js": "^6.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
