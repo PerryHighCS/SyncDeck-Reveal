@@ -30,6 +30,9 @@ This file applies to the `vendor/SyncDeck-Reveal/` submodule.
 ## Coverage Expectations
 
 - Prefer fixture-driven browser tests that load the runtime scripts directly.
+- If Playwright or another real-browser test fails because the container
+  sandbox blocks browser launch, rerun that test step with escalated
+  permissions instead of treating the sandbox failure as a product regression.
 - Coverage must expand with the code you touch. Avoid adding new uncovered
   branches to `reveal-iframe-sync.js` or `reveal-storyboard.js`.
 - Changes in covered areas must not reduce the existing coverage baseline once a
