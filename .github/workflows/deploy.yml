@@ -66,15 +66,18 @@ jobs:
                   raise SystemExit(
                       f"ERROR: invalid manifest directive on line {line_number}: {raw_line!r}"
                   )
-              if parts[0] != 'include':
+              directive = parts[0]
+              if directive == 'include-dev' or directive == 'exclude-dev':
+                  continue
+              if directive != 'include':
                   raise SystemExit(
-                      f"ERROR: unknown manifest directive '{parts[0]}' on line {line_number}"
+                      f"ERROR: unknown manifest directive '{directive}' on line {line_number}"
                   )
               pattern = parts[1].strip()
               src = root / pattern
               if src.is_dir():
                   shutil.copytree(src, site / pattern, dirs_exist_ok=True)
-                  print(f'  {pattern}/')
+                  print(f'  {pattern}')
               elif src.is_file():
                   dest = site / pattern
                   dest.parent.mkdir(parents=True, exist_ok=True)
@@ -91,11 +94,33 @@ jobs:
           <html lang="en">
           <head>
             <meta charset="UTF-8">
-            <meta http-equiv="refresh" content="0; url=test/manual-regression-lab.html">
             <title>SyncDeck Reveal</title>
+            <style>
+              body {
+                margin: 0;
+                font-family: system-ui, sans-serif;
+                background: #0b1220;
+                color: #e5ecff;
+              }
+              main {
+                max-width: 720px;
+                margin: 48px auto;
+                padding: 0 20px;
+              }
+              a {
+                color: #8bd3ff;
+              }
+            </style>
           </head>
           <body>
-            <p><a href="test/manual-regression-lab.html">Open manual regression lab</a></p>
+            <main>
+              <h1>SyncDeck Reveal</h1>
+              <p>This published site hosts the shared runtime assets used by classroom presentations.</p>
+              <ul>
+                <li><a href="dist/syncdeck-reveal.js">dist/syncdeck-reveal.js</a></li>
+                <li><a href="dist/syncdeck-reveal.css">dist/syncdeck-reveal.css</a></li>
+              </ul>
+            </main>
           </body>
           </html>
           HTML
