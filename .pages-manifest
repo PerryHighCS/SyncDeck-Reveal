@@ -1,6 +1,7 @@
 # Paths are relative to this file's directory.
-# Only 'include' lines are copied to the Pages site (files or directories).
+# `include` / `exclude` apply in all environments.
+# `include-dev` / `exclude-dev` apply only in local dev preview.
 
 include dist/
 include chalkboard/
-include test/manual-regression-lab.html
+include-dev test/manual-regression-lab.html
