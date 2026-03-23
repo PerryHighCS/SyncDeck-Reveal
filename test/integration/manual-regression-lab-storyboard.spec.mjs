@@ -120,6 +120,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
 
     const track = page.locator('#storyboard-track');
     await expect(track).toBeVisible();
+    await expect(page.locator('body')).toHaveClass(/storyboard-open/);
     await expect(page.locator('#storyboard-track .story-preview').first()).toBeVisible();
 
     const beforeDrag = await page.evaluate(() => {
@@ -147,6 +148,7 @@ test.describe('manual regression lab storyboard thumbnails', () => {
 
     const track = page.locator('#storyboard-track');
     await expect(track).toBeVisible();
+    await expect(page.locator('body')).toHaveClass(/storyboard-open/);
     await expect(page.locator('#storyboard-track .story-preview').first()).toBeVisible();
 
     // Wait until the track overflows (enough thumbnails rendered to scroll).
