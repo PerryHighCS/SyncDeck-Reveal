@@ -17,6 +17,8 @@ test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
     iframeSyncId: window.RevealIframeSync?.id ?? null,
     storyboardInitType: typeof window.initRevealStoryboard,
     bootstrapInitType: typeof window.initSyncDeckReveal,
+    buildLaunchUrlType: typeof window.buildSyncDeckLaunchUrl,
+    launchPresentationType: typeof window.launchPresentationInSyncDeck,
   }));
 
   expect(globals.revealLoaded).toBe(true);
@@ -25,6 +27,8 @@ test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
   expect(globals.iframeSyncId).toBe('RevealIframeSync');
   expect(globals.storyboardInitType).toBe('function');
   expect(globals.bootstrapInitType).toBe('function');
+  expect(globals.buildLaunchUrlType).toBe('function');
+  expect(globals.launchPresentationType).toBe('function');
 });
 
 test('preserves custom plugins while appending required SyncDeck plugins', async ({ page }) => {
@@ -133,4 +137,70 @@ test('strips chalkboard storage and emits an explicit warning', async ({ page })
 
   expect(result.initConfig.chalkboard.storage).toBeUndefined();
   expect(result.warnings.some((line) => line.includes('Ignoring chalkboard.storage'))).toBe(true);
+});
+
+test('buildSyncDeckLaunchUrl encodes the canonical presentation URL into the ActiveBits launch route', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const launchUrl = await page.evaluate(() => window.buildSyncDeckLaunchUrl({
+    activeBitsOrigin: 'https://bits.mycode.run',
+    presentationUrl: 'https://slides.example/course/deck.html#fragment-ignored',
+  }));
+
+  expect(launchUrl).toBe(
+    'https://bits.mycode.run/util/syncdeck/launch-presentation?presentationUrl='
+    + encodeURIComponent('https://slides.example/course/deck.html')
+  );
+});
+
+test('standalone hosting CTA appears briefly, uses the bundled asset path, and auto-hides', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const result = await page.evaluate(() => window.runBootstrapHarness({
+    standaloneHosting: {
+      activeBitsOrigin: 'https://bits.mycode.run',
+      presentationUrl: 'https://slides.example/unit/deck.html',
+      ctaTimeoutMs: 25,
+    },
+    extraWaitMs: 40,
+  }));
+
+  expect(result.buildLaunchUrlType).toBe('function');
+  expect(result.launchPresentationType).toBe('function');
+  expect(result.standaloneHostingState).toBe('idle');
+  expect(result.standaloneHostingVisible).toBe(false);
+  expect(result.standaloneHostingLogoSrc).toContain('/dist/assets/syncdeck.png');
+});
+
+test('standalone hosting CTA launches the ActiveBits utility route with the encoded presentation URL', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const clicked = await page.evaluate(() => window.runBootstrapHarness({
+    standaloneHosting: {
+      activeBitsOrigin: 'https://bits.mycode.run',
+      presentationUrl: 'https://slides.example/unit/deck.html',
+      ctaTimeoutMs: 5000,
+    },
+    clickStandaloneHostingButton: true,
+  }));
+
+  expect(clicked.launchCalls).toEqual([
+    'https://bits.mycode.run/util/syncdeck/launch-presentation?presentationUrl='
+      + encodeURIComponent('https://slides.example/unit/deck.html'),
+  ]);
+});
+
+test('standalone hosting CTA hides after role promotion', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const promoted = await page.evaluate(() => window.runBootstrapHarness({
+    standaloneHosting: {
+      activeBitsOrigin: 'https://bits.mycode.run',
+      presentationUrl: 'https://slides.example/unit/deck.html',
+      ctaTimeoutMs: 5000,
+    },
+    setRoleAfterInit: 'instructor',
+  }));
+
+  expect(promoted.standaloneHostingVisible).toBe(false);
 });

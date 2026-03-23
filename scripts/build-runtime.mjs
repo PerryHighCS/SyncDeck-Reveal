@@ -23,6 +23,25 @@ function parseOutDir(argv) {
   return path.resolve(rootDir, outDirValue);
 }
 
+async function copyDirectory(sourceDir, targetDir) {
+  await fs.mkdir(targetDir, { recursive: true });
+  const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirectory(sourcePath, targetPath);
+      continue;
+    }
+
+    if (entry.isFile()) {
+      await fs.copyFile(sourcePath, targetPath);
+    }
+  }
+}
+
 export async function buildRuntime(options = {}) {
   const outDir = path.resolve(rootDir, options.outDir || 'dist');
   await fs.mkdir(outDir, { recursive: true });
@@ -34,6 +53,15 @@ export async function buildRuntime(options = {}) {
     await bundle.write(config.output);
   } finally {
     await bundle.close();
+  }
+
+  const assetsDir = path.join(rootDir, 'assets');
+  try {
+    await copyDirectory(assetsDir, path.join(outDir, 'assets'));
+  } catch (error) {
+    if (error && error.code !== 'ENOENT') {
+      throw error;
+    }
   }
 
   return {

@@ -39,6 +39,7 @@
       pluginIds: [],
       customPluginInits: 0,
       afterInitRan: false,
+      launchCalls: [],
     };
 
     (function captureWarnings() {
@@ -120,9 +121,16 @@
       window.__bootstrapHarness.pluginIds = [];
       window.__bootstrapHarness.customPluginInits = 0;
       window.__bootstrapHarness.afterInitRan = false;
+      window.__bootstrapHarness.launchCalls = [];
 
       window.RevealNotes = { id: 'RevealNotes' };
-      window.RevealChalkboard = { id: 'RevealChalkboard' };
+      window.RevealChalkboard = {
+        id: 'RevealChalkboard',
+        getData: function () {
+          return '[]';
+        },
+        configure: function () {},
+      };
       window.Reveal = buildRevealStub(opts.asyncInitDelay || 0, !!opts.rejectInit);
 
       var customPlugin = {
@@ -142,6 +150,11 @@
           plugins: opts.includeCustomPlugins ? customPlugins : undefined,
         },
         chalkboardOverrides: opts.chalkboardOverrides || {},
+        standaloneHosting: opts.standaloneHosting ? Object.assign({}, opts.standaloneHosting, {
+          navigate: function (url) {
+            window.__bootstrapHarness.launchCalls.push(String(url));
+          },
+        }) : undefined,
         afterInit: function () {
           if (opts.afterInitThrows) {
             throw new Error('fixture afterInit failure');
@@ -164,6 +177,32 @@
         setTimeout(resolve, (opts.asyncInitDelay || 0) + 10);
       });
 
+      if (opts.setRoleAfterInit && window.RevealIframeSyncAPI) {
+        window.RevealIframeSyncAPI.setRole(opts.setRoleAfterInit);
+        await new Promise(function (resolve) {
+          setTimeout(resolve, 10);
+        });
+      }
+
+      if (opts.clickStandaloneHostingButton) {
+        var hostingButton = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__button');
+        if (hostingButton) {
+          hostingButton.click();
+          await new Promise(function (resolve) {
+            setTimeout(resolve, 10);
+          });
+        }
+      }
+
+      if (opts.extraWaitMs) {
+        await new Promise(function (resolve) {
+          setTimeout(resolve, opts.extraWaitMs);
+        });
+      }
+
+      var hostingRoot = document.getElementById('syncdeck-standalone-hosting');
+      var hostingLogo = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__logo');
+
       return {
         warnings: window.__bootstrapHarness.warnings.slice(),
         errors: window.__bootstrapHarness.errors.slice(),
@@ -175,6 +214,12 @@
         initRejected: initRejected,
         initError: initError,
         storyboardThumbs: document.querySelectorAll('#storyboard-track .story-thumb').length,
+        launchCalls: window.__bootstrapHarness.launchCalls.slice(),
+        buildLaunchUrlType: typeof window.buildSyncDeckLaunchUrl,
+        launchPresentationType: typeof window.launchPresentationInSyncDeck,
+        standaloneHostingVisible: hostingRoot ? hostingRoot.getAttribute('data-visible') === 'true' : false,
+        standaloneHostingState: hostingRoot ? hostingRoot.getAttribute('data-state') : null,
+        standaloneHostingLogoSrc: hostingLogo ? hostingLogo.src : null,
       };
     };
   </script>

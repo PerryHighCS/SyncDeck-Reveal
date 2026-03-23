@@ -10849,6 +10849,11 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
   (function (global) {
 
+    var HOSTING_STYLE_ID = 'syncdeck-standalone-hosting-styles';
+    var HOSTING_UI_ID = 'syncdeck-standalone-hosting';
+    var DEFAULT_HOSTING_CTA_LABEL = 'Host in SyncDeck';
+    var DEFAULT_HOSTING_ROUTE = '/util/syncdeck/launch-presentation';
+
     var REVEAL_DEFAULTS = {
       hash: true,
       hashOneBasedIndex: true,
@@ -10888,8 +10893,135 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       toggleKey: 'm',
     };
 
+    var STANDALONE_HOSTING_DEFAULTS = {
+      enabled: true,
+      activeBitsOrigin: null,
+      launchPath: DEFAULT_HOSTING_ROUTE,
+      presentationUrl: null,
+      ctaLabel: DEFAULT_HOSTING_CTA_LABEL,
+      ctaTimeoutMs: 9000,
+      logoUrl: null,
+      navigate: null,
+    };
+
     function merge(target, source) {
       return Object.assign({}, target || {}, source || {});
+    }
+
+    function trimToNull(value) {
+      if (typeof value !== 'string') return null;
+      var trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }
+
+    function readRequiredString(value, fieldName) {
+      var normalized = trimToNull(value);
+      if (!normalized) {
+        throw new Error('Missing ' + fieldName);
+      }
+      return normalized;
+    }
+
+    function parseAbsoluteHttpUrl(value, fieldName) {
+      var normalized = readRequiredString(value, fieldName);
+      var parsed;
+      try {
+        parsed = new URL(normalized, global.location && global.location.href ? global.location.href : undefined);
+      } catch {
+        throw new Error('Invalid ' + fieldName);
+      }
+
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('Invalid ' + fieldName);
+      }
+
+      return parsed;
+    }
+
+    function normalizeActiveBitsOrigin(value) {
+      return parseAbsoluteHttpUrl(value, 'ActiveBits origin').toString().replace(/\/+$/, '');
+    }
+
+    function normalizeLaunchPath(value) {
+      var normalized = trimToNull(value) || DEFAULT_HOSTING_ROUTE;
+      if (normalized.charAt(0) !== '/') {
+        normalized = '/' + normalized;
+      }
+      return normalized;
+    }
+
+    function getRuntimeBaseUrl() {
+      if (global.__syncdeckRuntimeBaseUrl) return global.__syncdeckRuntimeBaseUrl;
+
+      if (typeof document === 'undefined') return '';
+
+      var currentScript = document.currentScript;
+      if (currentScript && currentScript.src) {
+        global.__syncdeckRuntimeBaseUrl = new URL('.', currentScript.src).toString();
+        return global.__syncdeckRuntimeBaseUrl;
+      }
+
+      var scripts = document.getElementsByTagName('script');
+      for (var index = scripts.length - 1; index >= 0; index -= 1) {
+        var script = scripts[index];
+        var src = script && script.src;
+        if (!src) continue;
+        if (/syncdeck-reveal\.js(?:[?#].*)?$/.test(src)) {
+          global.__syncdeckRuntimeBaseUrl = new URL('.', src).toString();
+          return global.__syncdeckRuntimeBaseUrl;
+        }
+      }
+
+      var href = global.location && global.location.href ? global.location.href : 'http://localhost/';
+      global.__syncdeckRuntimeBaseUrl = new URL('./', href).toString();
+      return global.__syncdeckRuntimeBaseUrl;
+    }
+
+    function buildDefaultLogoUrl() {
+      return new URL('assets/syncdeck.png', getRuntimeBaseUrl()).toString();
+    }
+
+    function buildCanonicalPresentationUrl(explicitUrl) {
+      var currentUrl;
+      if (explicitUrl != null) {
+        currentUrl = parseAbsoluteHttpUrl(explicitUrl, 'presentation URL');
+      } else {
+        if (!global.location || !global.location.href) {
+          throw new Error('Missing presentation URL');
+        }
+
+        currentUrl = new URL(global.location.href);
+        if (currentUrl.protocol !== 'http:' && currentUrl.protocol !== 'https:') {
+          throw new Error('Invalid presentation URL');
+        }
+      }
+      currentUrl.hash = '';
+      return currentUrl.toString();
+    }
+
+    function getNavigateImplementation(config) {
+      if (config && typeof config.navigate === 'function') return config.navigate;
+      return function (url) {
+        global.location.assign(url);
+      };
+    }
+
+    function buildSyncDeckLaunchUrl(params) {
+      var options = params || {};
+      var activeBitsOrigin = normalizeActiveBitsOrigin(options.activeBitsOrigin);
+      var launchPath = normalizeLaunchPath(options.launchPath);
+      var presentationUrl = buildCanonicalPresentationUrl(options.presentationUrl);
+      var launchUrl = new URL(launchPath, activeBitsOrigin);
+      launchUrl.searchParams.set('presentationUrl', presentationUrl);
+      return launchUrl.toString();
+    }
+
+    function launchPresentationInSyncDeck(params) {
+      var options = params || {};
+      var navigate = getNavigateImplementation(options);
+      var launchUrl = buildSyncDeckLaunchUrl(options);
+      navigate(launchUrl);
+      return launchUrl;
     }
 
     function buildPlugins() {
@@ -10957,6 +11089,250 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       return chalkboardConfig;
     }
 
+    function normalizeStandaloneHostingConfig(config) {
+      if (config === false || config == null) return null;
+
+      var normalized = merge(STANDALONE_HOSTING_DEFAULTS, config);
+      if (normalized.enabled === false) return null;
+
+      if (!trimToNull(normalized.activeBitsOrigin)) {
+        return null;
+      }
+
+      normalized.activeBitsOrigin = normalizeActiveBitsOrigin(normalized.activeBitsOrigin);
+      normalized.launchPath = normalizeLaunchPath(normalized.launchPath);
+      normalized.ctaLabel = trimToNull(normalized.ctaLabel) || DEFAULT_HOSTING_CTA_LABEL;
+      normalized.logoUrl = trimToNull(normalized.logoUrl) || buildDefaultLogoUrl();
+      normalized.ctaTimeoutMs = Number(normalized.ctaTimeoutMs);
+      if (!Number.isFinite(normalized.ctaTimeoutMs) || normalized.ctaTimeoutMs < 0) {
+        normalized.ctaTimeoutMs = STANDALONE_HOSTING_DEFAULTS.ctaTimeoutMs;
+      }
+
+      if (normalized.presentationUrl != null) {
+        normalized.presentationUrl = buildCanonicalPresentationUrl(normalized.presentationUrl);
+      }
+
+      return normalized;
+    }
+
+    function ensureStandaloneHostingStyles() {
+      if (typeof document === 'undefined') return;
+      if (document.getElementById(HOSTING_STYLE_ID)) return;
+
+      var style = document.createElement('style');
+      style.id = HOSTING_STYLE_ID;
+      style.textContent = ''
+        + '#' + HOSTING_UI_ID + ' {'
+        + ' position: fixed;'
+        + ' top: 20px;'
+        + ' right: 20px;'
+        + ' z-index: 32;'
+        + ' max-width: min(420px, calc(100vw - 32px));'
+        + ' font-family: "Avenir Next", "Segoe UI", sans-serif;'
+        + ' color: #f8fafc;'
+        + ' opacity: 0;'
+        + ' transform: translateY(-10px);'
+        + ' pointer-events: none;'
+        + ' transition: opacity 180ms ease, transform 180ms ease;'
+        + '}'
+        + '#' + HOSTING_UI_ID + '[data-visible="true"] {'
+        + ' opacity: 1;'
+        + ' transform: translateY(0);'
+        + ' pointer-events: auto;'
+        + '}'
+        + '#' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__panel {'
+        + ' display: flex;'
+        + ' align-items: center;'
+        + ' gap: 12px;'
+        + ' padding: 12px 14px;'
+        + ' border-radius: 18px;'
+        + ' background: rgba(15, 23, 42, 0.94);'
+        + ' border: 1px solid rgba(148, 163, 184, 0.28);'
+        + ' box-shadow: 0 18px 48px rgba(15, 23, 42, 0.35);'
+        + ' backdrop-filter: blur(12px);'
+        + '}'
+        + '#' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__logo {'
+        + ' width: 42px;'
+        + ' height: 42px;'
+        + ' flex: 0 0 auto;'
+        + ' object-fit: contain;'
+        + ' border-radius: 12px;'
+        + ' background: rgba(255, 255, 255, 0.08);'
+        + ' padding: 6px;'
+        + '}'
+        + '#' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__actions {'
+        + ' display: flex;'
+        + ' align-items: center;'
+        + ' gap: 10px;'
+        + '}'
+        + '#' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__button {'
+        + ' appearance: none;'
+        + ' border: none;'
+        + ' border-radius: 999px;'
+        + ' padding: 10px 16px;'
+        + ' font: inherit;'
+        + ' font-size: 13px;'
+        + ' font-weight: 700;'
+        + ' cursor: pointer;'
+        + ' color: #082f49;'
+        + ' background: linear-gradient(135deg, #f8fafc 0%, #7dd3fc 100%);'
+        + ' white-space: nowrap;'
+        + '}'
+        + '@media (max-width: 720px) {'
+        + ' #' + HOSTING_UI_ID + ' {'
+        + '  top: 12px;'
+        + '  right: 12px;'
+        + '  left: 12px;'
+        + '  max-width: none;'
+        + ' }'
+        + ' #' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__panel {'
+        + '  align-items: flex-start;'
+        + ' }'
+        + ' #' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__actions {'
+        + '  width: 100%;'
+        + '  margin-left: 0;'
+        + ' }'
+        + ' #' + HOSTING_UI_ID + ' .syncdeck-standalone-hosting__button {'
+        + '  width: 100%;'
+        + ' }'
+        + '}';
+      document.head.appendChild(style);
+    }
+
+    function createStandaloneHostingUi(config) {
+      if (typeof document === 'undefined' || !config) return null;
+
+      ensureStandaloneHostingStyles();
+
+      var existing = document.getElementById(HOSTING_UI_ID);
+      if (existing) {
+        existing.remove();
+      }
+
+      var root = document.createElement('div');
+      root.id = HOSTING_UI_ID;
+      root.setAttribute('data-visible', 'false');
+      root.setAttribute('data-state', 'idle');
+
+      var panel = document.createElement('div');
+      panel.className = 'syncdeck-standalone-hosting__panel';
+
+      var logo = document.createElement('img');
+      logo.className = 'syncdeck-standalone-hosting__logo';
+      logo.alt = 'SyncDeck';
+      logo.src = config.logoUrl;
+      panel.appendChild(logo);
+
+      var actions = document.createElement('div');
+      actions.className = 'syncdeck-standalone-hosting__actions';
+
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'syncdeck-standalone-hosting__button';
+      button.textContent = config.ctaLabel;
+      button.setAttribute('aria-label', config.ctaLabel);
+      actions.appendChild(button);
+
+      panel.appendChild(actions);
+      root.appendChild(panel);
+      document.body.appendChild(root);
+
+      var hideTimer = null;
+      var active = true;
+
+      function clearHideTimer() {
+        if (!hideTimer) return;
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+
+      function scheduleHide() {
+        clearHideTimer();
+        if (config.ctaTimeoutMs <= 0) return;
+        hideTimer = global.setTimeout(function () {
+          if (!active) return;
+          root.setAttribute('data-visible', 'false');
+        }, config.ctaTimeoutMs);
+      }
+
+      function onClick() {
+        launchPresentationInSyncDeck(config);
+      }
+
+      button.addEventListener('click', onClick);
+
+      return {
+        show: function () {
+          if (!active) return;
+          root.setAttribute('data-visible', 'true');
+          scheduleHide();
+        },
+        hide: function () {
+          if (!active) return;
+          clearHideTimer();
+          root.setAttribute('data-visible', 'false');
+        },
+        syncRole: function (role) {
+          if (role === 'standalone') {
+            this.show();
+          } else {
+            this.hide();
+          }
+        },
+        destroy: function () {
+          active = false;
+          clearHideTimer();
+          button.removeEventListener('click', onClick);
+          root.remove();
+        },
+        getElement: function () {
+          return root;
+        },
+      };
+    }
+
+    function installStandaloneHostingController(config) {
+      var normalizedConfig;
+      try {
+        normalizedConfig = normalizeStandaloneHostingConfig(config);
+      } catch (error) {
+        if (typeof global.console !== 'undefined' && typeof global.console.warn === 'function') {
+          global.console.warn('[syncdeck-bootstrap] Unable to enable standalone hosting CTA:', error);
+        }
+        return null;
+      }
+
+      if (!normalizedConfig) return null;
+
+      var ui = createStandaloneHostingUi(normalizedConfig);
+      if (!ui) return null;
+
+      function syncFromApi() {
+        var role = null;
+        if (global.RevealIframeSyncAPI && typeof global.RevealIframeSyncAPI.getRole === 'function') {
+          role = global.RevealIframeSyncAPI.getRole();
+        }
+        ui.syncRole(role || 'standalone');
+      }
+
+      function onStatus(event) {
+        var role = event && event.detail ? event.detail.role : null;
+        ui.syncRole(role || 'standalone');
+      }
+
+      global.addEventListener('reveal-iframesync-status', onStatus);
+
+      return {
+        destroy: function () {
+          global.removeEventListener('reveal-iframesync-status', onStatus);
+          ui.destroy();
+        },
+        ui: ui,
+        config: normalizedConfig,
+        syncFromApi: syncFromApi,
+      };
+    }
+
     function initSyncDeckReveal(config) {
       var cfg = config || {};
       if (!cfg.deckId) {
@@ -10977,6 +11353,18 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       );
       revealConfig.plugins = mergePlugins(revealConfig.plugins, buildPlugins());
 
+      var standaloneHostingController = installStandaloneHostingController(cfg.standaloneHosting);
+      var afterInit = cfg.afterInit;
+      if (standaloneHostingController) {
+        afterInit = function (revealGlobal) {
+          standaloneHostingController.syncFromApi();
+          if (typeof cfg.afterInit === 'function') {
+            return cfg.afterInit(revealGlobal);
+          }
+          return undefined;
+        };
+      }
+
       var initResult = global.Reveal.initialize(revealConfig);
 
       if (typeof global.initRevealStoryboard === 'function') {
@@ -10989,11 +11377,11 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         });
       }
 
-      if (typeof cfg.afterInit === 'function') {
+      if (typeof afterInit === 'function') {
         if (initResult && typeof initResult.then === 'function') {
           initResult.then(
             function () {
-              runAfterInit(cfg.afterInit, global.Reveal);
+              runAfterInit(afterInit, global.Reveal);
             },
             function (error) {
               if (typeof global.console !== 'undefined' && typeof global.console.error === 'function') {
@@ -11002,13 +11390,15 @@ Please report this to https://github.com/markedjs/marked.`, r) {
             }
           );
         } else {
-          runAfterInit(cfg.afterInit, global.Reveal);
+          runAfterInit(afterInit, global.Reveal);
         }
       }
 
       return initResult;
     }
 
+    global.buildSyncDeckLaunchUrl = buildSyncDeckLaunchUrl;
+    global.launchPresentationInSyncDeck = launchPresentationInSyncDeck;
     global.initSyncDeckReveal = initSyncDeckReveal;
   }(window));
 
