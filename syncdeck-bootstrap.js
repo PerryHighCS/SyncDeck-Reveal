@@ -77,8 +77,11 @@
   function parseAbsoluteHttpUrl(value, fieldName) {
     var normalized = readRequiredString(value, fieldName);
     var parsed;
+    if (!/^https?:\/\//i.test(normalized)) {
+      throw new Error('Invalid ' + fieldName);
+    }
     try {
-      parsed = new URL(normalized, global.location && global.location.href ? global.location.href : undefined);
+      parsed = new URL(normalized);
     } catch {
       throw new Error('Invalid ' + fieldName);
     }

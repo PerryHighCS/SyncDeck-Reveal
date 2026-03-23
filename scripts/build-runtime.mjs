@@ -42,6 +42,11 @@ async function copyDirectory(sourceDir, targetDir) {
   }
 }
 
+async function replaceDirectory(sourceDir, targetDir) {
+  await fs.rm(targetDir, { recursive: true, force: true });
+  await copyDirectory(sourceDir, targetDir);
+}
+
 export async function buildRuntime(options = {}) {
   const outDir = path.resolve(rootDir, options.outDir || 'dist');
   await fs.mkdir(outDir, { recursive: true });
@@ -56,8 +61,9 @@ export async function buildRuntime(options = {}) {
   }
 
   const assetsDir = path.join(rootDir, 'assets');
+  const outAssetsDir = path.join(outDir, 'assets');
   try {
-    await copyDirectory(assetsDir, path.join(outDir, 'assets'));
+    await replaceDirectory(assetsDir, outAssetsDir);
   } catch (error) {
     if (error && error.code !== 'ENOENT') {
       throw error;

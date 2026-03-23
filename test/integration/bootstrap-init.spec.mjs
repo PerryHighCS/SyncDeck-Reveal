@@ -153,6 +153,24 @@ test('buildSyncDeckLaunchUrl encodes the canonical presentation URL into the Act
   );
 });
 
+test('buildSyncDeckLaunchUrl rejects non-absolute ActiveBits origins', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const errorMessage = await page.evaluate(() => {
+    try {
+      window.buildSyncDeckLaunchUrl({
+        activeBitsOrigin: 'bits.mycode.run',
+        presentationUrl: 'https://slides.example/course/deck.html',
+      });
+      return null;
+    } catch (error) {
+      return String(error && error.message ? error.message : error);
+    }
+  });
+
+  expect(errorMessage).toBe('Invalid ActiveBits origin');
+});
+
 test('standalone hosting CTA appears briefly, uses the bundled asset path, and auto-hides', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
