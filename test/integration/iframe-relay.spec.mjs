@@ -39,6 +39,10 @@ test.describe('iframe host relay behavior', () => {
     return messages.find((entry) => entry.data?.action === action);
   }
 
+  function findLastMessage(messages, action) {
+    return [...messages].reverse().find((entry) => entry.data?.action === action);
+  }
+
   async function postCommand(page, name, payload = {}) {
     await page.evaluate(
       ({ commandName, commandPayload }) => {
@@ -80,6 +84,89 @@ test.describe('iframe host relay behavior', () => {
     expect(state.data.role).toBe('student');
     expect(state.data.payload.reason).toBe('storyboardChanged');
     expect(state.data.payload.overview).toBe(true);
+  });
+
+  test('host receives presentation metadata from the iframe title', async ({ page }) => {
+    await gotoHost(page);
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata');
+    });
+
+    let messages = await hostMessages(page);
+    let metadata = findMessage(messages, 'metadata');
+    expect(metadata.data.role).toBe('standalone');
+    expect(metadata.data.payload).toEqual({ title: 'SyncDeck Runtime Harness' });
+
+    await clearHostMessages(page);
+
+    await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      frame.contentWindow.document.title = '  Updated Harness Title  ';
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata');
+    });
+
+    messages = await hostMessages(page);
+    metadata = findMessage(messages, 'metadata');
+    expect(metadata.data.payload).toEqual({ title: 'Updated Harness Title' });
+
+    await clearHostMessages(page);
+
+    const blankMetadata = await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      frame.contentWindow.document.title = '   ';
+      return frame.contentWindow.RevealIframeSyncAPI.getMetadata();
+    });
+
+    expect(blankMetadata).toEqual({});
+
+    await expect.poll(
+      async () => {
+        const currentMessages = await hostMessages(page);
+        return currentMessages.some((entry) => entry.data?.action === 'metadata');
+      },
+      { timeout: 300, intervals: [100, 100, 100] },
+    ).toBe(false);
+
+    await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      frame.contentWindow.RevealIframeSyncAPI.sendMetadata({ force: true });
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata');
+    });
+
+    messages = await hostMessages(page);
+    metadata = findMessage(messages, 'metadata');
+    expect(metadata.data.payload).toEqual({});
+  });
+
+  test('host receives metadata again when role changes even if payload is unchanged', async ({ page }) => {
+    await gotoHost(page);
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata' && entry.data?.role === 'standalone');
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata' && entry.data?.role === 'student');
+    });
+
+    const messages = await hostMessages(page);
+    const metadata = messages.find((entry) => entry.data?.action === 'metadata' && entry.data?.role === 'student');
+    expect(metadata?.data?.payload).toEqual({ title: 'SyncDeck Runtime Harness' });
   });
 
   test('host requestState receives full iframe status payload', async ({ page }) => {
@@ -606,9 +693,9 @@ test.describe('iframe host relay behavior', () => {
     ]);
 
     const messages = await hostMessages(page);
-    const roleChanged = findMessage(messages, 'roleChanged');
-    const ready = findMessage(messages, 'ready');
-    const chalkboardState = findMessage(messages, 'chalkboardState');
+    const roleChanged = findLastMessage(messages, 'roleChanged');
+    const ready = findLastMessage(messages, 'ready');
+    const chalkboardState = findLastMessage(messages, 'chalkboardState');
 
     expect(roleChanged?.data?.payload).toEqual({ role: 'standalone' });
     expect(ready?.data?.payload?.role).toBe('standalone');

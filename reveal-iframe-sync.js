@@ -24,7 +24,7 @@
  */
 
 (function () {
-  const IFRAME_SYNC_VERSION = '2.0.0';
+  const IFRAME_SYNC_VERSION = '2.1.0';
   const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
 
   const DEFAULTS = {
@@ -64,6 +64,36 @@
     if (!window.parent || window.parent === window) return;
     const message = buildMessage(ctx, action, payload);
     window.parent.postMessage(message, normalizeOrigin(ctx.config.hostOrigin));
+  }
+
+  function normalizePresentationTitle(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  function getPresentationMetadata() {
+    const title = normalizePresentationTitle(document.title);
+    if (!title) return {};
+    return { title };
+  }
+
+  function emitMetadata(ctx, options) {
+    const metadata = getPresentationMetadata();
+    const dedupeKey = JSON.stringify({
+      role: ctx.state.role,
+      payload: metadata,
+    });
+    const force = !!options?.force;
+    const hasMetadata = Object.keys(metadata).length > 0;
+
+    if (!hasMetadata && !force) return metadata;
+
+    if (!force && dedupeKey === ctx.state.lastPublishedMetadata) return metadata;
+
+    ctx.state.lastPublishedMetadata = dedupeKey;
+    safePostToParent(ctx, 'metadata', metadata);
+    return metadata;
   }
 
   function debugLog(...args) {
@@ -1045,7 +1075,72 @@
   function announceReady(ctx, reason) {
     const status = buildSyncStatusPayload(ctx, reason || 'init');
     safePostToParent(ctx, 'ready', status);
+    emitMetadata(ctx);
     emitLocalStatusEvent(ctx, reason || 'init');
+  }
+
+  function wireMetadataObserver(ctx) {
+    const publishMetadata = () => emitMetadata(ctx);
+    if (typeof MutationObserver !== 'function') {
+      window.addEventListener('load', publishMetadata);
+      ctx.cleanup.push(() => window.removeEventListener('load', publishMetadata));
+      return;
+    }
+
+    let titleObserver = null;
+
+    function disconnectTitleObserver() {
+      if (!titleObserver) return;
+      titleObserver.disconnect();
+      titleObserver = null;
+    }
+
+    function observeTitleElement() {
+      disconnectTitleObserver();
+
+      const titleEl = document.querySelector('head > title');
+      if (!titleEl) return;
+
+      titleObserver = new MutationObserver(() => {
+        publishMetadata();
+      });
+
+      titleObserver.observe(titleEl, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    }
+
+    if (document.head) {
+      const headObserver = new MutationObserver((mutations) => {
+        const titleChanged = mutations.some((mutation) => {
+          if (mutation.type !== 'childList') return false;
+
+          return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => (
+            node.nodeType === Node.ELEMENT_NODE
+            && node.nodeName === 'TITLE'
+          ));
+        });
+
+        if (!titleChanged) return;
+
+        observeTitleElement();
+        publishMetadata();
+      });
+
+      headObserver.observe(document.head, {
+        childList: true,
+      });
+      observeTitleElement();
+      ctx.cleanup.push(() => {
+        headObserver.disconnect();
+        disconnectTitleObserver();
+      });
+    }
+
+    window.addEventListener('load', publishMetadata);
+    ctx.cleanup.push(() => window.removeEventListener('load', publishMetadata));
   }
 
   function ensurePauseOverlay(ctx) {
@@ -2212,6 +2307,7 @@
         releaseStartH: null,
         releaseEndH: null,
         standaloneControlRefreshTimer: null,
+        lastPublishedMetadata: null,
       },
     };
 
@@ -2223,6 +2319,7 @@
 
     wireDeckEvents(ctx);
     wireWindowMessageListener(ctx);
+    wireMetadataObserver(ctx);
     wrapNavigationMethods(ctx);
     applyPauseLockUi(ctx);
 
@@ -2236,10 +2333,12 @@
       getStudentBoundary: () => getStudentBoundary(ctx),
       getCapabilities: () => getRoleCapabilities(ctx),
       getStatus: () => buildSyncStatusPayload(ctx, 'apiGetStatus'),
+      getMetadata: () => getPresentationMetadata(),
       setRole: (role) => {
         applyRoleChange(ctx, role, 'apiSetRole');
       },
       sendState: () => safePostToParent(ctx, 'state', currentDeckState(deck)),
+      sendMetadata: (options) => emitMetadata(ctx, options),
       sendCustom: (eventName, payload) => safePostToParent(ctx, eventName, payload || {}),
       chalkboard: {
         call: (method, ...args) => callChalkboard(ctx, method, args),
