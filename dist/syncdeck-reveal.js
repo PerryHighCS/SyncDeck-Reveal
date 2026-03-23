@@ -10958,7 +10958,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
     function normalizeLaunchPath(value) {
       var normalized = trimToNull(value) || DEFAULT_HOSTING_ROUTE;
-      if (/[\r\n]/.test(normalized) || /^\/\//.test(normalized) || /^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
+      if (/[\\\r\n]/.test(normalized) || /^\/\//.test(normalized) || /^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
         throw new Error('Invalid launch path');
       }
       if (normalized.charAt(0) !== '/') {

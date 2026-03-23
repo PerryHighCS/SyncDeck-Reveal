@@ -222,6 +222,25 @@ test('buildSyncDeckLaunchUrl rejects unsafe launch paths that could override the
   expect(errorMessage).toBe('Invalid launch path');
 });
 
+test('buildSyncDeckLaunchUrl rejects launch paths with backslashes that could be reinterpreted as host overrides', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const errorMessage = await page.evaluate(() => {
+    try {
+      window.buildSyncDeckLaunchUrl({
+        activeBitsOrigin: 'https://bits.mycode.run',
+        launchPath: '\\\\evil.example/path',
+        presentationUrl: 'https://slides.example/course/deck.html',
+      });
+      return null;
+    } catch (error) {
+      return String(error && error.message ? error.message : error);
+    }
+  });
+
+  expect(errorMessage).toBe('Invalid launch path');
+});
+
 test('standalone hosting CTA appears briefly, uses the bundled asset path, and auto-hides', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
