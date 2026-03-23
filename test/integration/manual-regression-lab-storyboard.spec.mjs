@@ -108,6 +108,34 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     expect(Math.abs(metrics.revealTranslateY)).toBeLessThanOrEqual(Math.ceil(metrics.storyboardHeight) + 1);
   });
 
+  test('storyboard preview is non-interactive and drag mode is enabled', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('reveal-storyboard-set', {
+        detail: { open: true },
+      }));
+    });
+
+    const track = page.locator('#storyboard-track');
+    await expect(track).toBeVisible();
+
+    const beforeDrag = await page.evaluate(() => {
+      const preview = document.querySelector('#storyboard-track .story-preview');
+      const revealStatus = window.RevealIframeSyncAPI.getStatus();
+      const trackEl = document.getElementById('storyboard-track');
+      return {
+        previewPointerEvents: preview ? getComputedStyle(preview).pointerEvents : '',
+        indices: revealStatus.indices,
+        draggableClassApplied: !!trackEl?.classList.contains('storyboard-draggable'),
+      };
+    });
+
+    expect(beforeDrag.previewPointerEvents).toBe('none');
+    expect(beforeDrag.draggableClassApplied).toBe(true);
+  });
+
   test('top stack boundary slide lets the student rewind off slide 5 and return to released fragments', async ({ page }) => {
     await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
 

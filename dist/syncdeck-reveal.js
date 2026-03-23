@@ -7860,6 +7860,9 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         const style = document.createElement('style');
         style.id = 'reveal-storyboard-boundary-css';
         style.textContent = [
+          '.storyboard-track.storyboard-draggable { cursor: grab; touch-action: pan-y; }',
+          '.storyboard-track.storyboard-dragging { cursor: grabbing; user-select: none; }',
+          '.story-preview, .story-preview * { pointer-events: none !important; }',
           '.story-thumb-wrap { position: relative; display: inline-flex; flex-shrink: 0; }',
           '.story-thumb-wrap.story-stack-wrap { flex-direction: column; gap: 6px; }',
           '.story-boundary-btn {',
@@ -8011,8 +8014,79 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         applyStoryboardRangeClasses();
       }
 
+      function initTrackDragScroll() {
+        const DRAG_THRESHOLD_PX = 6;
+        let activePointerId = null;
+        let dragStartX = 0;
+        let dragStartScrollLeft = 0;
+        let pointerDown = false;
+        let didDrag = false;
+        let suppressClick = false;
+
+        storyboardTrack.classList.add('storyboard-draggable');
+
+        storyboardTrack.addEventListener('pointerdown', (event) => {
+          if (event.pointerType === 'mouse' && event.button !== 0) return;
+          pointerDown = true;
+          didDrag = false;
+          activePointerId = event.pointerId;
+          dragStartX = event.clientX;
+          dragStartScrollLeft = storyboardTrack.scrollLeft;
+        });
+
+        window.addEventListener('pointermove', (event) => {
+          if (!pointerDown || event.pointerId !== activePointerId) return;
+          const deltaX = event.clientX - dragStartX;
+          if (!didDrag && Math.abs(deltaX) >= DRAG_THRESHOLD_PX) {
+            didDrag = true;
+            storyboardTrack.classList.add('storyboard-dragging');
+          }
+          if (!didDrag) return;
+
+          storyboardTrack.scrollLeft = dragStartScrollLeft - deltaX;
+          event.preventDefault();
+        });
+
+        function endPointerDrag(event) {
+          if (activePointerId == null || event.pointerId !== activePointerId) return;
+          pointerDown = false;
+
+          if (didDrag) {
+            suppressClick = true;
+            setTimeout(() => {
+              suppressClick = false;
+            }, 0);
+          }
+
+          didDrag = false;
+          activePointerId = null;
+          storyboardTrack.classList.remove('storyboard-dragging');
+        }
+
+        window.addEventListener('pointerup', endPointerDrag);
+        window.addEventListener('pointercancel', endPointerDrag);
+
+        window.addEventListener('blur', () => {
+          pointerDown = false;
+          didDrag = false;
+          activePointerId = null;
+          storyboardTrack.classList.remove('storyboard-dragging');
+        });
+
+        storyboardTrack.addEventListener('dragstart', (event) => {
+          event.preventDefault();
+        });
+
+        storyboardTrack.addEventListener('click', (event) => {
+          if (!suppressClick) return;
+          event.preventDefault();
+          event.stopPropagation();
+        }, true);
+      }
+
       injectBoundaryStyles();
       liveRegion = createLiveRegion();
+      initTrackDragScroll();
 
       // ── Slide data ──────────────────────────────────────────────────────────
       const slideSections = Array.from(document.querySelectorAll('.reveal .slides > section'));
