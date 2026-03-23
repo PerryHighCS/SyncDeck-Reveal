@@ -120,14 +120,13 @@ test.describe('manual regression lab storyboard thumbnails', () => {
 
     const track = page.locator('#storyboard-track');
     await expect(track).toBeVisible();
+    await expect(page.locator('#storyboard-track .story-preview').first()).toBeVisible();
 
     const beforeDrag = await page.evaluate(() => {
       const preview = document.querySelector('#storyboard-track .story-preview');
-      const revealStatus = window.RevealIframeSyncAPI.getStatus();
       const trackEl = document.getElementById('storyboard-track');
       return {
         previewPointerEvents: preview ? getComputedStyle(preview).pointerEvents : '',
-        indices: revealStatus.indices,
         draggableClassApplied: !!trackEl?.classList.contains('storyboard-draggable'),
       };
     });

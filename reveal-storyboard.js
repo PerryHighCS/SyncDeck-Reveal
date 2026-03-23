@@ -247,7 +247,15 @@
     }
 
     function initTrackDragScroll() {
+      const existingDragState = storyboardTrack.__syncDeckStoryboardDragState;
+      if (existingDragState && typeof existingDragState.cleanup === 'function') {
+        return existingDragState.cleanup;
+      }
+
       const DRAG_THRESHOLD_PX = 6;
+      const dragAbortController = typeof AbortController === 'function'
+        ? new AbortController()
+        : null;
       let activePointerId = null;
       let dragStartX = 0;
       let dragStartScrollLeft = 0;
@@ -255,9 +263,36 @@
       let didDrag = false;
       let suppressClick = false;
 
+      function addDragListener(target, type, handler, options = {}) {
+        const listenerOptions = dragAbortController
+          ? { ...options, signal: dragAbortController.signal }
+          : options;
+        target.addEventListener(type, handler, listenerOptions);
+      }
+
+      function resetPointerDrag() {
+        pointerDown = false;
+        didDrag = false;
+        activePointerId = null;
+        storyboardTrack.classList.remove('storyboard-dragging');
+      }
+
+      function cleanupPointerDrag() {
+        resetPointerDrag();
+        storyboardTrack.classList.remove('storyboard-draggable');
+        if (dragAbortController) {
+          dragAbortController.abort();
+        }
+        delete storyboardTrack.__syncDeckStoryboardDragState;
+      }
+
+      storyboardTrack.__syncDeckStoryboardDragState = {
+        cleanup: cleanupPointerDrag,
+      };
+
       storyboardTrack.classList.add('storyboard-draggable');
 
-      storyboardTrack.addEventListener('pointerdown', (event) => {
+      addDragListener(storyboardTrack, 'pointerdown', (event) => {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
         pointerDown = true;
         didDrag = false;
@@ -266,8 +301,16 @@
         dragStartScrollLeft = storyboardTrack.scrollLeft;
       });
 
-      window.addEventListener('pointermove', (event) => {
+      addDragListener(window, 'pointermove', (event) => {
         if (!pointerDown || event.pointerId !== activePointerId) return;
+
+        const pointerReleased = event.buttons === 0
+          || (event.pointerType !== 'mouse' && event.pressure === 0);
+        if (pointerReleased) {
+          resetPointerDrag();
+          return;
+        }
+
         const deltaX = event.clientX - dragStartX;
         if (!didDrag && Math.abs(deltaX) >= DRAG_THRESHOLD_PX) {
           didDrag = true;
@@ -281,7 +324,6 @@
 
       function endPointerDrag(event) {
         if (activePointerId == null || event.pointerId !== activePointerId) return;
-        pointerDown = false;
 
         if (didDrag) {
           suppressClick = true;
@@ -290,30 +332,27 @@
           }, 0);
         }
 
-        didDrag = false;
-        activePointerId = null;
-        storyboardTrack.classList.remove('storyboard-dragging');
+        resetPointerDrag();
       }
 
-      window.addEventListener('pointerup', endPointerDrag);
-      window.addEventListener('pointercancel', endPointerDrag);
+      addDragListener(window, 'pointerup', endPointerDrag);
+      addDragListener(window, 'pointercancel', endPointerDrag);
 
-      window.addEventListener('blur', () => {
-        pointerDown = false;
-        didDrag = false;
-        activePointerId = null;
-        storyboardTrack.classList.remove('storyboard-dragging');
+      addDragListener(window, 'blur', () => {
+        resetPointerDrag();
       });
 
-      storyboardTrack.addEventListener('dragstart', (event) => {
+      addDragListener(storyboardTrack, 'dragstart', (event) => {
         event.preventDefault();
       });
 
-      storyboardTrack.addEventListener('click', (event) => {
+      addDragListener(storyboardTrack, 'click', (event) => {
         if (!suppressClick) return;
         event.preventDefault();
         event.stopPropagation();
-      }, true);
+      }, { capture: true });
+
+      return cleanupPointerDrag;
     }
 
     injectBoundaryStyles();
