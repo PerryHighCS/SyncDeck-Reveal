@@ -62,13 +62,19 @@ export async function buildRuntime(options = {}) {
 
   const assetsDir = path.join(rootDir, 'assets');
   const outAssetsDir = path.join(outDir, 'assets');
+  let assetsStat;
   try {
-    await replaceDirectory(assetsDir, outAssetsDir);
+    assetsStat = await fs.stat(assetsDir);
   } catch (error) {
-    if (error && error.code !== 'ENOENT') {
-      throw error;
+    if (error && error.code === 'ENOENT') {
+      throw new Error('Missing required runtime assets directory: assets');
     }
+    throw error;
   }
+  if (!assetsStat.isDirectory()) {
+    throw new Error('Missing required runtime assets directory: assets');
+  }
+  await replaceDirectory(assetsDir, outAssetsDir);
 
   return {
     outDir,

@@ -229,15 +229,22 @@ test('standalone hosting CTA appears briefly, uses the bundled asset path, and a
     standaloneHosting: {
       activeBitsOrigin: 'https://bits.mycode.run',
       presentationUrl: 'https://slides.example/unit/deck.html',
-      ctaTimeoutMs: 25,
+      ctaTimeoutMs: 500,
     },
-    extraWaitMs: 40,
+    waitForStandaloneHostingHidden: {
+      timeoutMs: 1500,
+      pollIntervalMs: 25,
+    },
   }));
 
   expect(result.buildLaunchUrlType).toBe('function');
   expect(result.launchPresentationType).toBe('function');
   expect(result.standaloneHostingState).toBe('idle');
   expect(result.standaloneHostingVisible).toBe(false);
+  expect(result.standaloneHostingAriaHidden).toBe('true');
+  expect(result.standaloneHostingInert).toBe(true);
+  expect(result.standaloneHostingButtonDisabled).toBe(true);
+  expect(result.standaloneHostingButtonTabIndex).toBe(-1);
   expect(result.standaloneHostingLogoSrc).toContain('/dist/assets/syncdeck.png');
 });
 

@@ -11260,6 +11260,20 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       var hideTimer = null;
       var active = true;
 
+      function applyVisibilityState(visible) {
+        root.setAttribute('data-visible', visible ? 'true' : 'false');
+        root.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        if (visible) {
+          root.removeAttribute('inert');
+          button.disabled = false;
+          button.tabIndex = 0;
+        } else {
+          root.setAttribute('inert', '');
+          button.disabled = true;
+          button.tabIndex = -1;
+        }
+      }
+
       function clearHideTimer() {
         if (!hideTimer) return;
         clearTimeout(hideTimer);
@@ -11271,7 +11285,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         if (config.ctaTimeoutMs <= 0) return;
         hideTimer = global.setTimeout(function () {
           if (!active) return;
-          root.setAttribute('data-visible', 'false');
+          applyVisibilityState(false);
         }, config.ctaTimeoutMs);
       }
 
@@ -11280,17 +11294,18 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       }
 
       button.addEventListener('click', onClick);
+      applyVisibilityState(false);
 
       return {
         show: function () {
           if (!active) return;
-          root.setAttribute('data-visible', 'true');
+          applyVisibilityState(true);
           scheduleHide();
         },
         hide: function () {
           if (!active) return;
           clearHideTimer();
-          root.setAttribute('data-visible', 'false');
+          applyVisibilityState(false);
         },
         syncRole: function (role) {
           if (role === 'standalone') {

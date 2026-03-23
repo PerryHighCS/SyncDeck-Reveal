@@ -211,8 +211,38 @@
         });
       }
 
+      if (opts.waitForStandaloneHostingHidden) {
+        var waitTimeoutMs = typeof opts.waitForStandaloneHostingHidden.timeoutMs === 'number'
+          ? opts.waitForStandaloneHostingHidden.timeoutMs
+          : 1000;
+        var pollIntervalMs = typeof opts.waitForStandaloneHostingHidden.pollIntervalMs === 'number'
+          ? opts.waitForStandaloneHostingHidden.pollIntervalMs
+          : 20;
+        var waitStartedAt = Date.now();
+
+        await new Promise(function (resolve, reject) {
+          function poll() {
+            var root = document.getElementById('syncdeck-standalone-hosting');
+            if (!root || root.getAttribute('data-visible') === 'false') {
+              resolve();
+              return;
+            }
+
+            if (Date.now() - waitStartedAt >= waitTimeoutMs) {
+              reject(new Error('Timed out waiting for standalone hosting CTA to hide'));
+              return;
+            }
+
+            setTimeout(poll, pollIntervalMs);
+          }
+
+          poll();
+        });
+      }
+
       var hostingRoot = document.getElementById('syncdeck-standalone-hosting');
       var hostingLogo = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__logo');
+      var hostingButton = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__button');
 
       return {
         warnings: window.__bootstrapHarness.warnings.slice(),
@@ -231,6 +261,10 @@
         standaloneHostingNodes: document.querySelectorAll('#syncdeck-standalone-hosting').length,
         standaloneHostingVisible: hostingRoot ? hostingRoot.getAttribute('data-visible') === 'true' : false,
         standaloneHostingState: hostingRoot ? hostingRoot.getAttribute('data-state') : null,
+        standaloneHostingAriaHidden: hostingRoot ? hostingRoot.getAttribute('aria-hidden') : null,
+        standaloneHostingInert: hostingRoot ? hostingRoot.hasAttribute('inert') : false,
+        standaloneHostingButtonDisabled: hostingButton ? hostingButton.disabled : null,
+        standaloneHostingButtonTabIndex: hostingButton ? hostingButton.tabIndex : null,
         standaloneHostingLogoSrc: hostingLogo ? hostingLogo.src : null,
       };
     };
