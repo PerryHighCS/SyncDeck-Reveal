@@ -262,6 +262,7 @@
       let pointerDown = false;
       let didDrag = false;
       let suppressClick = false;
+      let suppressClickTimeoutId = null;
 
       function addDragListener(target, type, handler, options = {}) {
         const listenerOptions = dragAbortController
@@ -279,6 +280,11 @@
 
       function cleanupPointerDrag() {
         resetPointerDrag();
+        if (suppressClickTimeoutId !== null) {
+          clearTimeout(suppressClickTimeoutId);
+          suppressClickTimeoutId = null;
+          suppressClick = false;
+        }
         storyboardTrack.classList.remove('storyboard-draggable');
         if (dragAbortController) {
           dragAbortController.abort();
@@ -329,8 +335,12 @@
         if (activePointerId == null || event.pointerId !== activePointerId) return;
 
         if (didDrag) {
+          if (suppressClickTimeoutId !== null) {
+            clearTimeout(suppressClickTimeoutId);
+          }
           suppressClick = true;
-          setTimeout(() => {
+          suppressClickTimeoutId = setTimeout(() => {
+            suppressClickTimeoutId = null;
             suppressClick = false;
           }, 0);
         }

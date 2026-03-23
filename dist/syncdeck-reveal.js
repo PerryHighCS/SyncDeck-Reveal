@@ -8030,6 +8030,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         let pointerDown = false;
         let didDrag = false;
         let suppressClick = false;
+        let suppressClickTimeoutId = null;
 
         function addDragListener(target, type, handler, options = {}) {
           const listenerOptions = dragAbortController
@@ -8047,6 +8048,11 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
         function cleanupPointerDrag() {
           resetPointerDrag();
+          if (suppressClickTimeoutId !== null) {
+            clearTimeout(suppressClickTimeoutId);
+            suppressClickTimeoutId = null;
+            suppressClick = false;
+          }
           storyboardTrack.classList.remove('storyboard-draggable');
           if (dragAbortController) {
             dragAbortController.abort();
@@ -8097,8 +8103,12 @@ Please report this to https://github.com/markedjs/marked.`, r) {
           if (activePointerId == null || event.pointerId !== activePointerId) return;
 
           if (didDrag) {
+            if (suppressClickTimeoutId !== null) {
+              clearTimeout(suppressClickTimeoutId);
+            }
             suppressClick = true;
-            setTimeout(() => {
+            suppressClickTimeoutId = setTimeout(() => {
+              suppressClickTimeoutId = null;
               suppressClick = false;
             }, 0);
           }
