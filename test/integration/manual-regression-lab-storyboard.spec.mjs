@@ -108,6 +108,133 @@ test.describe('manual regression lab storyboard thumbnails', () => {
     expect(Math.abs(metrics.revealTranslateY)).toBeLessThanOrEqual(Math.ceil(metrics.storyboardHeight) + 1);
   });
 
+  test('storyboard preview is non-interactive and drag mode is enabled', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('reveal-storyboard-set', {
+        detail: { open: true },
+      }));
+    });
+
+    const track = page.locator('#storyboard-track');
+    await expect(track).toBeVisible();
+    await expect(page.locator('body')).toHaveClass(/storyboard-open/);
+    await expect(page.locator('#storyboard-track .story-preview').first()).toBeVisible();
+
+    const beforeDrag = await page.evaluate(() => {
+      const preview = document.querySelector('#storyboard-track .story-preview');
+      const trackEl = document.getElementById('storyboard-track');
+      return {
+        previewPointerEvents: preview ? getComputedStyle(preview).pointerEvents : '',
+        draggableClassApplied: !!trackEl?.classList.contains('storyboard-draggable'),
+      };
+    });
+
+    expect(beforeDrag.previewPointerEvents).toBe('none');
+    expect(beforeDrag.draggableClassApplied).toBe(true);
+  });
+
+  test('drag gesture scrolls the storyboard track and post-drag click is suppressed', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('reveal-storyboard-set', {
+        detail: { open: true },
+      }));
+    });
+
+    const track = page.locator('#storyboard-track');
+    await expect(track).toBeVisible();
+    await expect(page.locator('body')).toHaveClass(/storyboard-open/);
+    await expect(page.locator('#storyboard-track .story-preview').first()).toBeVisible();
+
+    // Wait until the track overflows (enough thumbnails rendered to scroll).
+    await page.waitForFunction(() => {
+      const el = document.getElementById('storyboard-track');
+      return el && el.scrollWidth > el.clientWidth + 100;
+    });
+
+    const result = await page.evaluate(() => {
+      const trackEl = document.getElementById('storyboard-track');
+
+      // Pre-scroll to mid-point so dragging right (decreasing scrollLeft) has room.
+      const maxScroll = trackEl.scrollWidth - trackEl.clientWidth;
+      trackEl.scrollLeft = Math.floor(maxScroll / 2);
+      const initialScrollLeft = trackEl.scrollLeft;
+      const initialH = window.Reveal?.getIndices()?.h ?? 0;
+
+      const trackRect = trackEl.getBoundingClientRect();
+      const startX = trackRect.left + trackRect.width / 2;
+      const startY = trackRect.top + trackRect.height / 2;
+      const dragDistance = 80;
+
+      // Simulate pointerdown on the track.
+      trackEl.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, view: window,
+        pointerId: 1, pointerType: 'mouse', isPrimary: true,
+        button: 0, buttons: 1,
+        clientX: startX, clientY: startY,
+      }));
+
+      // Simulate pointermove in increments to exceed the 6 px drag threshold.
+      for (let dx = 10; dx <= dragDistance; dx += 10) {
+        window.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, cancelable: true, view: window,
+          pointerId: 1, pointerType: 'mouse', isPrimary: true,
+          buttons: 1,
+          clientX: startX + dx, clientY: startY,
+        }));
+      }
+
+      // Simulate pointerup — this sets suppressClick = true synchronously.
+      window.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true, cancelable: true, view: window,
+        pointerId: 1, pointerType: 'mouse', isPrimary: true,
+        button: 0, buttons: 0,
+        clientX: startX + dragDistance, clientY: startY,
+      }));
+
+      const afterScrollLeft = trackEl.scrollLeft;
+      const afterDragH = window.Reveal?.getIndices()?.h ?? 0;
+
+      // Dispatch a click on the first thumbnail immediately, before the
+      // setTimeout(0) that resets suppressClick has a chance to fire.
+      // The capture-phase track listener should stop the event before it
+      // reaches the target, so the thumbnail listener must not fire.
+      let clickReachedTarget = false;
+      const firstThumb = trackEl.querySelector('.story-thumb');
+      if (firstThumb) {
+        firstThumb.addEventListener('click', () => { clickReachedTarget = true; }, {
+          once: true,
+          capture: false,
+        });
+        firstThumb.dispatchEvent(new MouseEvent('click', {
+          bubbles: true, cancelable: true, view: window,
+        }));
+      }
+
+      return {
+        initialScrollLeft,
+        afterScrollLeft,
+        initialH,
+        afterDragH,
+        hasThumb: !!firstThumb,
+        clickReachedTarget,
+      };
+    });
+
+    // Dragging right by 80 px should have decreased scrollLeft.
+    expect(result.afterScrollLeft).toBeLessThan(result.initialScrollLeft);
+    // The drag gesture must not have changed the active slide.
+    expect(result.afterDragH).toBe(result.initialH);
+    // Click dispatched synchronously after pointerup must be suppressed.
+    expect(result.hasThumb).toBe(true);
+    expect(result.clickReachedTarget).toBe(false);
+  });
+
   test('top stack boundary slide lets the student rewind off slide 5 and return to released fragments', async ({ page }) => {
     await page.goto(`${server.baseUrl}/test/manual-regression-lab.html`);
 

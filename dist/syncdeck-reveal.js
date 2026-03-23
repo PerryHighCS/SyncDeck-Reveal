@@ -7860,6 +7860,9 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         const style = document.createElement('style');
         style.id = 'reveal-storyboard-boundary-css';
         style.textContent = [
+          '.storyboard-draggable { cursor: grab; touch-action: pan-y; }',
+          '.storyboard-dragging { cursor: grabbing; user-select: none; }',
+          '.story-preview, .story-preview * { pointer-events: none !important; }',
           '.story-thumb-wrap { position: relative; display: inline-flex; flex-shrink: 0; }',
           '.story-thumb-wrap.story-stack-wrap { flex-direction: column; gap: 6px; }',
           '.story-boundary-btn {',
@@ -8011,8 +8014,131 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         applyStoryboardRangeClasses();
       }
 
+      function initTrackDragScroll() {
+        const existingDragState = storyboardTrack.__syncDeckStoryboardDragState;
+        if (existingDragState && typeof existingDragState.cleanup === 'function') {
+          return existingDragState.cleanup;
+        }
+
+        const DRAG_THRESHOLD_PX = 6;
+        const dragAbortController = typeof AbortController === 'function'
+          ? new AbortController()
+          : null;
+        let activePointerId = null;
+        let dragStartX = 0;
+        let dragStartScrollLeft = 0;
+        let pointerDown = false;
+        let didDrag = false;
+        let suppressClick = false;
+        let suppressClickTimeoutId = null;
+
+        function addDragListener(target, type, handler, options = {}) {
+          const listenerOptions = dragAbortController
+            ? { ...options, signal: dragAbortController.signal }
+            : options;
+          target.addEventListener(type, handler, listenerOptions);
+        }
+
+        function resetPointerDrag() {
+          pointerDown = false;
+          didDrag = false;
+          activePointerId = null;
+          storyboardTrack.classList.remove('storyboard-dragging');
+        }
+
+        function cleanupPointerDrag() {
+          resetPointerDrag();
+          if (suppressClickTimeoutId !== null) {
+            clearTimeout(suppressClickTimeoutId);
+            suppressClickTimeoutId = null;
+            suppressClick = false;
+          }
+          storyboardTrack.classList.remove('storyboard-draggable');
+          if (dragAbortController) {
+            dragAbortController.abort();
+          }
+          delete storyboardTrack.__syncDeckStoryboardDragState;
+        }
+
+        storyboardTrack.__syncDeckStoryboardDragState = {
+          cleanup: cleanupPointerDrag,
+        };
+
+        storyboardTrack.classList.add('storyboard-draggable');
+
+        addDragListener(storyboardTrack, 'pointerdown', (event) => {
+          if (event.pointerType === 'mouse' && event.button !== 0) return;
+          // Ignore additional pointers while a drag is already in progress
+          // (e.g. a second finger on touch) to prevent mid-gesture state reset.
+          if (activePointerId !== null) return;
+          pointerDown = true;
+          didDrag = false;
+          activePointerId = event.pointerId;
+          dragStartX = event.clientX;
+          dragStartScrollLeft = storyboardTrack.scrollLeft;
+        });
+
+        addDragListener(window, 'pointermove', (event) => {
+          if (!pointerDown || event.pointerId !== activePointerId) return;
+
+          const pointerReleased = event.buttons === 0
+            || (event.pointerType !== 'mouse' && event.pressure === 0);
+          if (pointerReleased) {
+            resetPointerDrag();
+            return;
+          }
+
+          const deltaX = event.clientX - dragStartX;
+          if (!didDrag && Math.abs(deltaX) >= DRAG_THRESHOLD_PX) {
+            didDrag = true;
+            storyboardTrack.classList.add('storyboard-dragging');
+          }
+          if (!didDrag) return;
+
+          storyboardTrack.scrollLeft = dragStartScrollLeft - deltaX;
+          event.preventDefault();
+        });
+
+        function endPointerDrag(event) {
+          if (activePointerId == null || event.pointerId !== activePointerId) return;
+
+          if (didDrag) {
+            if (suppressClickTimeoutId !== null) {
+              clearTimeout(suppressClickTimeoutId);
+            }
+            suppressClick = true;
+            suppressClickTimeoutId = setTimeout(() => {
+              suppressClickTimeoutId = null;
+              suppressClick = false;
+            }, 0);
+          }
+
+          resetPointerDrag();
+        }
+
+        addDragListener(window, 'pointerup', endPointerDrag);
+        addDragListener(window, 'pointercancel', endPointerDrag);
+
+        addDragListener(window, 'blur', () => {
+          resetPointerDrag();
+        });
+
+        addDragListener(storyboardTrack, 'dragstart', (event) => {
+          event.preventDefault();
+        });
+
+        addDragListener(storyboardTrack, 'click', (event) => {
+          if (!suppressClick) return;
+          event.preventDefault();
+          event.stopPropagation();
+        }, { capture: true });
+
+        return cleanupPointerDrag;
+      }
+
       injectBoundaryStyles();
       liveRegion = createLiveRegion();
+      initTrackDragScroll();
 
       // ── Slide data ──────────────────────────────────────────────────────────
       const slideSections = Array.from(document.querySelectorAll('.reveal .slides > section'));
