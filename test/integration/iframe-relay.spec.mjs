@@ -82,6 +82,36 @@ test.describe('iframe host relay behavior', () => {
     expect(state.data.payload.overview).toBe(true);
   });
 
+  test('host receives presentation metadata from the iframe title', async ({ page }) => {
+    await gotoHost(page);
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata');
+    });
+
+    let messages = await hostMessages(page);
+    let metadata = findMessage(messages, 'metadata');
+    expect(metadata.data.role).toBe('standalone');
+    expect(metadata.data.payload).toEqual({ title: 'SyncDeck Runtime Harness' });
+
+    await clearHostMessages(page);
+
+    await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      frame.contentWindow.document.title = '  Updated Harness Title  ';
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata');
+    });
+
+    messages = await hostMessages(page);
+    metadata = findMessage(messages, 'metadata');
+    expect(metadata.data.payload).toEqual({ title: 'Updated Harness Title' });
+  });
+
   test('host requestState receives full iframe status payload', async ({ page }) => {
     await gotoHost(page);
 

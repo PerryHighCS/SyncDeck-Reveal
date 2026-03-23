@@ -8493,7 +8493,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
    */
 
   (function () {
-    const IFRAME_SYNC_VERSION = '2.0.0';
+    const IFRAME_SYNC_VERSION = '2.1.0';
     const NAV_LOCK_STYLE_ID = 'reveal-iframe-sync-nav-lock-styles';
 
     const DEFAULTS = {
@@ -8533,6 +8533,30 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       if (!window.parent || window.parent === window) return;
       const message = buildMessage(ctx, action, payload);
       window.parent.postMessage(message, normalizeOrigin(ctx.config.hostOrigin));
+    }
+
+    function normalizePresentationTitle(value) {
+      if (typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }
+
+    function getPresentationMetadata() {
+      const title = normalizePresentationTitle(document.title);
+      if (!title) return null;
+      return { title };
+    }
+
+    function emitMetadata(ctx, options) {
+      const metadata = getPresentationMetadata();
+      const serialized = metadata ? JSON.stringify(metadata) : '';
+      const force = !!options?.force;
+
+      if (!force && serialized === ctx.state.lastPublishedMetadata) return metadata;
+
+      ctx.state.lastPublishedMetadata = serialized;
+      safePostToParent(ctx, 'metadata', metadata || {});
+      return metadata;
     }
 
     function debugLog(...args) {
@@ -9513,7 +9537,28 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     function announceReady(ctx, reason) {
       const status = buildSyncStatusPayload(ctx, reason || 'init');
       safePostToParent(ctx, 'ready', status);
+      emitMetadata(ctx);
       emitLocalStatusEvent(ctx, reason || 'init');
+    }
+
+    function wireMetadataObserver(ctx) {
+      const publishMetadata = () => emitMetadata(ctx);
+
+      const observer = new MutationObserver(() => {
+        publishMetadata();
+      });
+
+      if (document.head) {
+        observer.observe(document.head, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+        ctx.cleanup.push(() => observer.disconnect());
+      }
+
+      window.addEventListener('load', publishMetadata);
+      ctx.cleanup.push(() => window.removeEventListener('load', publishMetadata));
     }
 
     function ensurePauseOverlay(ctx) {
@@ -10680,6 +10725,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
           releaseStartH: null,
           releaseEndH: null,
           standaloneControlRefreshTimer: null,
+          lastPublishedMetadata: null,
         },
       };
 
@@ -10691,6 +10737,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
       wireDeckEvents(ctx);
       wireWindowMessageListener(ctx);
+      wireMetadataObserver(ctx);
       wrapNavigationMethods(ctx);
       applyPauseLockUi(ctx);
 
@@ -10704,10 +10751,12 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         getStudentBoundary: () => getStudentBoundary(ctx),
         getCapabilities: () => getRoleCapabilities(ctx),
         getStatus: () => buildSyncStatusPayload(ctx, 'apiGetStatus'),
+        getMetadata: () => getPresentationMetadata(),
         setRole: (role) => {
           applyRoleChange(ctx, role, 'apiSetRole');
         },
         sendState: () => safePostToParent(ctx, 'state', currentDeckState(deck)),
+        sendMetadata: (options) => emitMetadata(ctx, options),
         sendCustom: (eventName, payload) => safePostToParent(ctx, eventName, payload || {}),
         chalkboard: {
           call: (method, ...args) => callChalkboard(ctx, method, args),
