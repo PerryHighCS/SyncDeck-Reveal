@@ -110,6 +110,34 @@ test.describe('iframe host relay behavior', () => {
     messages = await hostMessages(page);
     metadata = findMessage(messages, 'metadata');
     expect(metadata.data.payload).toEqual({ title: 'Updated Harness Title' });
+
+    await clearHostMessages(page);
+
+    const blankMetadata = await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      frame.contentWindow.document.title = '   ';
+      return frame.contentWindow.RevealIframeSyncAPI.getMetadata();
+    });
+
+    expect(blankMetadata).toEqual({});
+
+    await page.waitForTimeout(100);
+    messages = await hostMessages(page);
+    expect(messages.some((entry) => entry.data?.action === 'metadata')).toBe(false);
+
+    await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      frame.contentWindow.RevealIframeSyncAPI.sendMetadata({ force: true });
+    });
+
+    await page.waitForFunction(() => {
+      const messages = window.__hostHarness.getMessages();
+      return messages.some((entry) => entry.data?.action === 'metadata');
+    });
+
+    messages = await hostMessages(page);
+    metadata = findMessage(messages, 'metadata');
+    expect(metadata.data.payload).toEqual({});
   });
 
   test('host requestState receives full iframe status payload', async ({ page }) => {

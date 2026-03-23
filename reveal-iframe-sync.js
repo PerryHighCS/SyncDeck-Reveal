@@ -74,19 +74,22 @@
 
   function getPresentationMetadata() {
     const title = normalizePresentationTitle(document.title);
-    if (!title) return null;
+    if (!title) return {};
     return { title };
   }
 
   function emitMetadata(ctx, options) {
     const metadata = getPresentationMetadata();
-    const serialized = metadata ? JSON.stringify(metadata) : '';
+    const serialized = JSON.stringify(metadata);
     const force = !!options?.force;
+    const hasMetadata = Object.keys(metadata).length > 0;
+
+    if (!hasMetadata && !force) return metadata;
 
     if (!force && serialized === ctx.state.lastPublishedMetadata) return metadata;
 
     ctx.state.lastPublishedMetadata = serialized;
-    safePostToParent(ctx, 'metadata', metadata || {});
+    safePostToParent(ctx, 'metadata', metadata);
     return metadata;
   }
 
