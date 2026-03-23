@@ -10851,6 +10851,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
     var HOSTING_STYLE_ID = 'syncdeck-standalone-hosting-styles';
     var HOSTING_UI_ID = 'syncdeck-standalone-hosting';
+    var HOSTING_CONTROLLER_GLOBAL_KEY = '__syncdeckStandaloneHostingController';
     var DEFAULT_HOSTING_CTA_LABEL = 'Host in SyncDeck';
     var DEFAULT_HOSTING_ROUTE = '/util/syncdeck/launch-presentation';
 
@@ -10942,7 +10943,17 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     }
 
     function normalizeActiveBitsOrigin(value) {
-      return parseAbsoluteHttpUrl(value, 'ActiveBits origin').toString().replace(/\/+$/, '');
+      var parsed = parseAbsoluteHttpUrl(value, 'ActiveBits origin');
+      if (
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash ||
+        parsed.pathname !== '/'
+      ) {
+        throw new Error('Invalid ActiveBits origin');
+      }
+      return parsed.origin;
     }
 
     function normalizeLaunchPath(value) {
@@ -11301,6 +11312,11 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     }
 
     function installStandaloneHostingController(config) {
+      if (global[HOSTING_CONTROLLER_GLOBAL_KEY] && typeof global[HOSTING_CONTROLLER_GLOBAL_KEY].destroy === 'function') {
+        global[HOSTING_CONTROLLER_GLOBAL_KEY].destroy();
+        global[HOSTING_CONTROLLER_GLOBAL_KEY] = null;
+      }
+
       var normalizedConfig;
       try {
         normalizedConfig = normalizeStandaloneHostingConfig(config);
@@ -11331,15 +11347,21 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
       global.addEventListener('reveal-iframesync-status', onStatus);
 
-      return {
+      var controller = {
         destroy: function () {
           global.removeEventListener('reveal-iframesync-status', onStatus);
           ui.destroy();
+          if (global[HOSTING_CONTROLLER_GLOBAL_KEY] === controller) {
+            global[HOSTING_CONTROLLER_GLOBAL_KEY] = null;
+          }
         },
         ui: ui,
         config: normalizedConfig,
         syncFromApi: syncFromApi,
       };
+
+      global[HOSTING_CONTROLLER_GLOBAL_KEY] = controller;
+      return controller;
     }
 
     function initSyncDeckReveal(config) {

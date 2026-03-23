@@ -171,6 +171,38 @@ test('buildSyncDeckLaunchUrl rejects non-absolute ActiveBits origins', async ({ 
   expect(errorMessage).toBe('Invalid ActiveBits origin');
 });
 
+test('buildSyncDeckLaunchUrl rejects ActiveBits origin values that are not bare origins', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const results = await page.evaluate(() => {
+    const inputs = [
+      'https://bits.mycode.run/path',
+      'https://bits.mycode.run?foo=bar',
+      'https://bits.mycode.run#hash',
+      'https://user@bits.mycode.run',
+    ];
+
+    return inputs.map((activeBitsOrigin) => {
+      try {
+        window.buildSyncDeckLaunchUrl({
+          activeBitsOrigin,
+          presentationUrl: 'https://slides.example/course/deck.html',
+        });
+        return null;
+      } catch (error) {
+        return String(error && error.message ? error.message : error);
+      }
+    });
+  });
+
+  expect(results).toEqual([
+    'Invalid ActiveBits origin',
+    'Invalid ActiveBits origin',
+    'Invalid ActiveBits origin',
+    'Invalid ActiveBits origin',
+  ]);
+});
+
 test('buildSyncDeckLaunchUrl rejects unsafe launch paths that could override the host origin', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
@@ -240,4 +272,20 @@ test('standalone hosting CTA hides after role promotion', async ({ page }) => {
   }));
 
   expect(promoted.standaloneHostingVisible).toBe(false);
+});
+
+test('standalone hosting controller is replaced cleanly when initSyncDeckReveal runs more than once', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const result = await page.evaluate(() => window.runBootstrapHarness({
+    standaloneHosting: {
+      activeBitsOrigin: 'https://bits.mycode.run',
+      presentationUrl: 'https://slides.example/unit/deck.html',
+      ctaTimeoutMs: 5000,
+    },
+    reinitStandaloneHosting: true,
+  }));
+
+  expect(result.standaloneHostingNodes).toBe(1);
+  expect(result.standaloneHostingVisible).toBe(true);
 });
