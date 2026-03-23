@@ -92,8 +92,8 @@
       const style = document.createElement('style');
       style.id = 'reveal-storyboard-boundary-css';
       style.textContent = [
-        '.storyboard-track.storyboard-draggable { cursor: grab; touch-action: pan-y; }',
-        '.storyboard-track.storyboard-dragging { cursor: grabbing; user-select: none; }',
+        '.storyboard-draggable { cursor: grab; touch-action: pan-y; }',
+        '.storyboard-dragging { cursor: grabbing; user-select: none; }',
         '.story-preview, .story-preview * { pointer-events: none !important; }',
         '.story-thumb-wrap { position: relative; display: inline-flex; flex-shrink: 0; }',
         '.story-thumb-wrap.story-stack-wrap { flex-direction: column; gap: 6px; }',
@@ -294,6 +294,9 @@
 
       addDragListener(storyboardTrack, 'pointerdown', (event) => {
         if (event.pointerType === 'mouse' && event.button !== 0) return;
+        // Ignore additional pointers while a drag is already in progress
+        // (e.g. a second finger on touch) to prevent mid-gesture state reset.
+        if (activePointerId !== null) return;
         pointerDown = true;
         didDrag = false;
         activePointerId = event.pointerId;
