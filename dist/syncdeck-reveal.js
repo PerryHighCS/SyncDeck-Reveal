@@ -9543,18 +9543,62 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
     function wireMetadataObserver(ctx) {
       const publishMetadata = () => emitMetadata(ctx);
+      if (typeof MutationObserver !== 'function') {
+        window.addEventListener('load', publishMetadata);
+        ctx.cleanup.push(() => window.removeEventListener('load', publishMetadata));
+        return;
+      }
 
-      const observer = new MutationObserver(() => {
-        publishMetadata();
-      });
+      let titleObserver = null;
+
+      function disconnectTitleObserver() {
+        if (!titleObserver) return;
+        titleObserver.disconnect();
+        titleObserver = null;
+      }
+
+      function observeTitleElement() {
+        disconnectTitleObserver();
+
+        const titleEl = document.querySelector('head > title');
+        if (!titleEl) return;
+
+        titleObserver = new MutationObserver(() => {
+          publishMetadata();
+        });
+
+        titleObserver.observe(titleEl, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      }
 
       if (document.head) {
-        observer.observe(document.head, {
-          childList: true,
-          subtree: true,
-          characterData: true,
+        const headObserver = new MutationObserver((mutations) => {
+          const titleChanged = mutations.some((mutation) => {
+            if (mutation.type !== 'childList') return false;
+
+            return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => (
+              node.nodeType === Node.ELEMENT_NODE
+              && node.nodeName === 'TITLE'
+            ));
+          });
+
+          if (!titleChanged) return;
+
+          observeTitleElement();
+          publishMetadata();
         });
-        ctx.cleanup.push(() => observer.disconnect());
+
+        headObserver.observe(document.head, {
+          childList: true,
+        });
+        observeTitleElement();
+        ctx.cleanup.push(() => {
+          headObserver.disconnect();
+          disconnectTitleObserver();
+        });
       }
 
       window.addEventListener('load', publishMetadata);
