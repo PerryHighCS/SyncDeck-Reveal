@@ -23,6 +23,30 @@ function parseOutDir(argv) {
   return path.resolve(rootDir, outDirValue);
 }
 
+async function copyDirectory(sourceDir, targetDir) {
+  await fs.mkdir(targetDir, { recursive: true });
+  const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirectory(sourcePath, targetPath);
+      continue;
+    }
+
+    if (entry.isFile()) {
+      await fs.copyFile(sourcePath, targetPath);
+    }
+  }
+}
+
+async function replaceDirectory(sourceDir, targetDir) {
+  await fs.rm(targetDir, { recursive: true, force: true });
+  await copyDirectory(sourceDir, targetDir);
+}
+
 export async function buildRuntime(options = {}) {
   const outDir = path.resolve(rootDir, options.outDir || 'dist');
   await fs.mkdir(outDir, { recursive: true });
@@ -35,6 +59,22 @@ export async function buildRuntime(options = {}) {
   } finally {
     await bundle.close();
   }
+
+  const assetsDir = path.join(rootDir, 'assets');
+  const outAssetsDir = path.join(outDir, 'assets');
+  let assetsStat;
+  try {
+    assetsStat = await fs.stat(assetsDir);
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      throw new Error('Missing required runtime assets directory: assets');
+    }
+    throw error;
+  }
+  if (!assetsStat.isDirectory()) {
+    throw new Error('Missing required runtime assets directory: assets');
+  }
+  await replaceDirectory(assetsDir, outAssetsDir);
 
   return {
     outDir,

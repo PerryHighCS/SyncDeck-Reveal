@@ -39,6 +39,7 @@
       pluginIds: [],
       customPluginInits: 0,
       afterInitRan: false,
+      launchCalls: [],
     };
 
     (function captureWarnings() {
@@ -120,9 +121,16 @@
       window.__bootstrapHarness.pluginIds = [];
       window.__bootstrapHarness.customPluginInits = 0;
       window.__bootstrapHarness.afterInitRan = false;
+      window.__bootstrapHarness.launchCalls = [];
 
       window.RevealNotes = { id: 'RevealNotes' };
-      window.RevealChalkboard = { id: 'RevealChalkboard' };
+      window.RevealChalkboard = {
+        id: 'RevealChalkboard',
+        getData: function () {
+          return '[]';
+        },
+        configure: function () {},
+      };
       window.Reveal = buildRevealStub(opts.asyncInitDelay || 0, !!opts.rejectInit);
 
       var customPlugin = {
@@ -136,23 +144,32 @@
         customPlugins.push(window.RevealIframeSync);
       }
 
-      var initResult = window.initSyncDeckReveal({
-        deckId: 'fixture-deck',
-        revealOverrides: {
-          plugins: opts.includeCustomPlugins ? customPlugins : undefined,
-        },
-        chalkboardOverrides: opts.chalkboardOverrides || {},
-        afterInit: function () {
-          if (opts.afterInitThrows) {
-            throw new Error('fixture afterInit failure');
-          }
-          if (opts.afterInitRejects) {
-            return Promise.reject(new Error('fixture afterInit async rejection'));
-          }
-          window.__bootstrapHarness.afterInitRan = true;
-          window.__bootstrapHarness.events.push('after-init');
-        },
-      });
+      function buildInitOptions() {
+        return {
+          deckId: 'fixture-deck',
+          revealOverrides: {
+            plugins: opts.includeCustomPlugins ? customPlugins : undefined,
+          },
+          chalkboardOverrides: opts.chalkboardOverrides || {},
+          standaloneHosting: opts.standaloneHosting ? Object.assign({}, opts.standaloneHosting, {
+            navigate: function (url) {
+              window.__bootstrapHarness.launchCalls.push(String(url));
+            },
+          }) : undefined,
+          afterInit: function () {
+            if (opts.afterInitThrows) {
+              throw new Error('fixture afterInit failure');
+            }
+            if (opts.afterInitRejects) {
+              return Promise.reject(new Error('fixture afterInit async rejection'));
+            }
+            window.__bootstrapHarness.afterInitRan = true;
+            window.__bootstrapHarness.events.push('after-init');
+          },
+        };
+      }
+
+      var initResult = window.initSyncDeckReveal(buildInitOptions());
 
       var initRejected = false;
       var initError = null;
@@ -163,6 +180,69 @@
       await new Promise(function (resolve) {
         setTimeout(resolve, (opts.asyncInitDelay || 0) + 10);
       });
+
+      if (opts.reinitStandaloneHosting) {
+        await Promise.resolve(window.initSyncDeckReveal(buildInitOptions())).catch(function () {});
+        await new Promise(function (resolve) {
+          setTimeout(resolve, 10);
+        });
+      }
+
+      if (opts.setRoleAfterInit && window.RevealIframeSyncAPI) {
+        window.RevealIframeSyncAPI.setRole(opts.setRoleAfterInit);
+        await new Promise(function (resolve) {
+          setTimeout(resolve, 10);
+        });
+      }
+
+      if (opts.clickStandaloneHostingButton) {
+        var hostingButton = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__button');
+        if (hostingButton) {
+          hostingButton.click();
+          await new Promise(function (resolve) {
+            setTimeout(resolve, 10);
+          });
+        }
+      }
+
+      if (opts.extraWaitMs) {
+        await new Promise(function (resolve) {
+          setTimeout(resolve, opts.extraWaitMs);
+        });
+      }
+
+      if (opts.waitForStandaloneHostingHidden) {
+        var waitTimeoutMs = typeof opts.waitForStandaloneHostingHidden.timeoutMs === 'number'
+          ? opts.waitForStandaloneHostingHidden.timeoutMs
+          : 1000;
+        var pollIntervalMs = typeof opts.waitForStandaloneHostingHidden.pollIntervalMs === 'number'
+          ? opts.waitForStandaloneHostingHidden.pollIntervalMs
+          : 20;
+        var waitStartedAt = Date.now();
+
+        await new Promise(function (resolve, reject) {
+          function poll() {
+            var root = document.getElementById('syncdeck-standalone-hosting');
+            if (!root || root.getAttribute('data-visible') === 'false') {
+              resolve();
+              return;
+            }
+
+            if (Date.now() - waitStartedAt >= waitTimeoutMs) {
+              reject(new Error('Timed out waiting for standalone hosting CTA to hide'));
+              return;
+            }
+
+            setTimeout(poll, pollIntervalMs);
+          }
+
+          poll();
+        });
+      }
+
+      var hostingRoot = document.getElementById('syncdeck-standalone-hosting');
+      var hostingLogo = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__logo');
+      var hostingButton = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__button');
 
       return {
         warnings: window.__bootstrapHarness.warnings.slice(),
@@ -175,6 +255,17 @@
         initRejected: initRejected,
         initError: initError,
         storyboardThumbs: document.querySelectorAll('#storyboard-track .story-thumb').length,
+        launchCalls: window.__bootstrapHarness.launchCalls.slice(),
+        buildLaunchUrlType: typeof window.buildSyncDeckLaunchUrl,
+        launchPresentationType: typeof window.launchPresentationInSyncDeck,
+        standaloneHostingNodes: document.querySelectorAll('#syncdeck-standalone-hosting').length,
+        standaloneHostingVisible: hostingRoot ? hostingRoot.getAttribute('data-visible') === 'true' : false,
+        standaloneHostingState: hostingRoot ? hostingRoot.getAttribute('data-state') : null,
+        standaloneHostingAriaHidden: hostingRoot ? hostingRoot.getAttribute('aria-hidden') : null,
+        standaloneHostingInert: hostingRoot ? hostingRoot.hasAttribute('inert') : false,
+        standaloneHostingButtonDisabled: hostingButton ? hostingButton.disabled : null,
+        standaloneHostingButtonTabIndex: hostingButton ? hostingButton.tabIndex : null,
+        standaloneHostingLogoSrc: hostingLogo ? hostingLogo.src : null,
       };
     };
   </script>
