@@ -99,8 +99,14 @@
 
   function normalizeLaunchPath(value) {
     var normalized = trimToNull(value) || DEFAULT_HOSTING_ROUTE;
+    if (/[\r\n]/.test(normalized) || /^\/\//.test(normalized) || /^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
+      throw new Error('Invalid launch path');
+    }
     if (normalized.charAt(0) !== '/') {
       normalized = '/' + normalized;
+    }
+    if (/^\/\//.test(normalized)) {
+      throw new Error('Invalid launch path');
     }
     return normalized;
   }
