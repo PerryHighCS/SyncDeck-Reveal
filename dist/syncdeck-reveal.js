@@ -8549,15 +8549,18 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
     function emitMetadata(ctx, options) {
       const metadata = getPresentationMetadata();
-      const serialized = JSON.stringify(metadata);
+      const dedupeKey = JSON.stringify({
+        role: ctx.state.role,
+        payload: metadata,
+      });
       const force = !!options?.force;
       const hasMetadata = Object.keys(metadata).length > 0;
 
       if (!hasMetadata && !force) return metadata;
 
-      if (!force && serialized === ctx.state.lastPublishedMetadata) return metadata;
+      if (!force && dedupeKey === ctx.state.lastPublishedMetadata) return metadata;
 
-      ctx.state.lastPublishedMetadata = serialized;
+      ctx.state.lastPublishedMetadata = dedupeKey;
       safePostToParent(ctx, 'metadata', metadata);
       return metadata;
     }
