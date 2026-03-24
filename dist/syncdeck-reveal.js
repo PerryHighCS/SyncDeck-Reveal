@@ -11135,6 +11135,17 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       return normalized;
     }
 
+    function isTopLevelPresentationContext() {
+      if (typeof global.__syncdeckStandaloneHostingTopLevelOverride === 'boolean') {
+        return global.__syncdeckStandaloneHostingTopLevelOverride;
+      }
+      try {
+        return global.top === global;
+      } catch {
+        return false;
+      }
+    }
+
     function ensureStandaloneHostingStyles() {
       if (typeof document === 'undefined') return;
       if (document.getElementById(HOSTING_STYLE_ID)) return;
@@ -11343,6 +11354,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       }
 
       if (!normalizedConfig) return null;
+      if (!isTopLevelPresentationContext()) return null;
 
       var ui = createStandaloneHostingUi(normalizedConfig);
       if (!ui) return null;

@@ -4,7 +4,7 @@ This document defines the `postMessage` protocol used by `reveal-iframe-sync.js`
 
 ## Presentation Team Handoff
 
-For statically hosted presentations, the recommended "Host in SyncDeck" flow is an
+For statically hosted presentations, the recommended "Activate SyncDeck" flow is an
 ActiveBits-owned launch route under `/util/syncdeck`.
 
 Target flow:
@@ -19,14 +19,14 @@ https://bits.mycode.run/util/syncdeck/launch-presentation?presentationUrl=<encod
 3. ActiveBits validates that `presentationUrl` passes the normal SyncDeck preflight
    checks and is actually a supported SyncDeck presentation.
 4. ActiveBits creates and configures the SyncDeck session entirely on its own origin.
-5. ActiveBits redirects into the normal hosted manager UI for that new session.
+5. ActiveBits redirects into the standalone SyncDeck student session for that new session.
 
 Why this is the preferred contract:
 - Static presentation hosts do not need CORS support.
-- The presentation does not need to handle instructor passcodes, bootstrap tokens, or
-  any other ActiveBits session secrets.
-- ActiveBits stays responsible for preflight validation, session creation, and manager
-  bootstrap on its own origin.
+- The presentation does not need to handle ActiveBits session bootstrap or call SyncDeck
+  APIs directly.
+- ActiveBits stays responsible for preflight validation and session creation on its own
+  origin.
 - The launch surface stays contained under SyncDeck-owned utility routing rather than a
   generic top-level utility path.
 
@@ -34,16 +34,16 @@ Presentation-team expectations:
 - Provide a stable absolute `http(s)` `presentationUrl`.
 - Redirect the browser to the ActiveBits
   `/util/syncdeck/launch-presentation` route when the user clicks the
-  "Host in SyncDeck" control.
+  "Activate SyncDeck" control.
 
 ActiveBits-side validation expectations:
 - The launch route should run the same Reveal/SyncDeck preflight checks already used to
   determine whether a URL is a compatible SyncDeck presentation.
 - If preflight fails, ActiveBits should stop before session creation and show a clear
-  user-facing error instead of starting a broken manager session.
+  user-facing error instead of starting a broken standalone session.
 
 This launch flow is intentionally separate from the iframe `postMessage` protocol
-documented below. Once the manager route loads the presentation iframe, the normal
+documented below. Once the standalone session loads the presentation iframe, the normal
 `reveal-sync` message schema applies unchanged.
 
 ## Envelope (all messages)

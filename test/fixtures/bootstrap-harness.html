@@ -114,6 +114,7 @@
 
     window.runBootstrapHarness = async function (options) {
       var opts = options || {};
+      var originalTopLevelOverride = window.__syncdeckStandaloneHostingTopLevelOverride;
       window.__bootstrapHarness.warnings = [];
       window.__bootstrapHarness.errors = [];
       window.__bootstrapHarness.events = [];
@@ -132,6 +133,12 @@
         configure: function () {},
       };
       window.Reveal = buildRevealStub(opts.asyncInitDelay || 0, !!opts.rejectInit);
+
+      if (typeof opts.simulateTopLevelStandaloneHosting === 'boolean') {
+        window.__syncdeckStandaloneHostingTopLevelOverride = opts.simulateTopLevelStandaloneHosting;
+      } else {
+        delete window.__syncdeckStandaloneHostingTopLevelOverride;
+      }
 
       var customPlugin = {
         id: opts.customPluginId || 'CustomFixturePlugin',
@@ -243,6 +250,11 @@
       var hostingRoot = document.getElementById('syncdeck-standalone-hosting');
       var hostingLogo = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__logo');
       var hostingButton = document.querySelector('#syncdeck-standalone-hosting .syncdeck-standalone-hosting__button');
+      if (typeof originalTopLevelOverride === 'boolean') {
+        window.__syncdeckStandaloneHostingTopLevelOverride = originalTopLevelOverride;
+      } else {
+        delete window.__syncdeckStandaloneHostingTopLevelOverride;
+      }
 
       return {
         warnings: window.__bootstrapHarness.warnings.slice(),

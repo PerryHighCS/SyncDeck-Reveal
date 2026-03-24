@@ -315,3 +315,19 @@ test('standalone hosting controller is replaced cleanly when initSyncDeckReveal 
   expect(result.standaloneHostingNodes).toBe(1);
   expect(result.standaloneHostingVisible).toBe(true);
 });
+
+test('standalone hosting CTA does not install when the deck is hosted inside an iframe', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const result = await page.evaluate(() => window.runBootstrapHarness({
+    standaloneHosting: {
+      activeBitsOrigin: 'https://bits.mycode.run',
+      presentationUrl: 'https://slides.example/unit/deck.html',
+      ctaTimeoutMs: 5000,
+    },
+    simulateTopLevelStandaloneHosting: false,
+  }));
+
+  expect(result.standaloneHostingNodes).toBe(0);
+  expect(result.standaloneHostingVisible).toBe(false);
+});

@@ -4,7 +4,7 @@
   var HOSTING_STYLE_ID = 'syncdeck-standalone-hosting-styles';
   var HOSTING_UI_ID = 'syncdeck-standalone-hosting';
   var HOSTING_CONTROLLER_GLOBAL_KEY = '__syncdeckStandaloneHostingController';
-  var DEFAULT_HOSTING_CTA_LABEL = 'Host in SyncDeck';
+  var DEFAULT_HOSTING_CTA_LABEL = 'Activate SyncDeck';
   var DEFAULT_HOSTING_ROUTE = '/util/syncdeck/launch-presentation';
 
   var REVEAL_DEFAULTS = {
@@ -287,6 +287,17 @@
     return normalized;
   }
 
+  function isTopLevelPresentationContext() {
+    if (typeof global.__syncdeckStandaloneHostingTopLevelOverride === 'boolean') {
+      return global.__syncdeckStandaloneHostingTopLevelOverride;
+    }
+    try {
+      return global.top === global;
+    } catch {
+      return false;
+    }
+  }
+
   function ensureStandaloneHostingStyles() {
     if (typeof document === 'undefined') return;
     if (document.getElementById(HOSTING_STYLE_ID)) return;
@@ -495,6 +506,7 @@
     }
 
     if (!normalizedConfig) return null;
+    if (!isTopLevelPresentationContext()) return null;
 
     var ui = createStandaloneHostingUi(normalizedConfig);
     if (!ui) return null;
