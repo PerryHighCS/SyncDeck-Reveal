@@ -10852,7 +10852,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     var HOSTING_STYLE_ID = 'syncdeck-standalone-hosting-styles';
     var HOSTING_UI_ID = 'syncdeck-standalone-hosting';
     var HOSTING_CONTROLLER_GLOBAL_KEY = '__syncdeckStandaloneHostingController';
-    var DEFAULT_HOSTING_CTA_LABEL = 'Host in SyncDeck';
+    var DEFAULT_HOSTING_CTA_LABEL = 'Activate SyncDeck';
     var DEFAULT_HOSTING_ROUTE = '/util/syncdeck/launch-presentation';
 
     var REVEAL_DEFAULTS = {
