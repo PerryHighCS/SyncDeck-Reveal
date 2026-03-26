@@ -4,7 +4,7 @@
   var HOSTING_STYLE_ID = 'syncdeck-standalone-hosting-styles';
   var HOSTING_UI_ID = 'syncdeck-standalone-hosting';
   var HOSTING_CONTROLLER_GLOBAL_KEY = '__syncdeckStandaloneHostingController';
-  var DEFAULT_HOSTING_CTA_LABEL = 'Activate SyncDeck';
+  var DEFAULT_HOSTING_CTA_LABEL = 'Activate SyncDeck Student';
   var DEFAULT_HOSTING_ROUTE = '/util/syncdeck/launch-presentation';
 
   var REVEAL_DEFAULTS = {

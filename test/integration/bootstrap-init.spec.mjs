@@ -264,6 +264,7 @@ test('standalone hosting CTA appears briefly, uses the bundled asset path, and a
   expect(result.standaloneHostingInert).toBe(true);
   expect(result.standaloneHostingButtonDisabled).toBe(true);
   expect(result.standaloneHostingButtonTabIndex).toBe(-1);
+  expect(result.standaloneHostingButtonText).toBe('Activate SyncDeck Student');
   expect(result.standaloneHostingLogoSrc).toContain('/dist/assets/syncdeck.png');
 });
 

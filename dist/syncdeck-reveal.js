@@ -8573,7 +8573,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     function readDevModeQueryFlag() {
       try {
         const params = new URLSearchParams(window.location.search);
-        const value = params.get('devmode') || params.get('syncdeckDevMode');
+        const value = params.get('devmode') ?? params.get('syncdeckDevMode');
         if (value == null) return false;
         const normalized = String(value).trim().toLowerCase();
         return normalized === '' || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
@@ -8756,8 +8756,9 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
       announceReady(ctx, readyReason);
       emitActivityRequestForCurrentSlide(ctx);
-      emitActivityPreloadRequest(ctx);
-      emitActivityBundlePreloadRequest(ctx);
+      const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+      emitActivityPreloadRequest(ctx, preloadPayload);
+      emitActivityBundlePreloadRequest(ctx, preloadPayload);
 
       if (canBroadcastChalkboard(ctx)) {
         // Broadcast the current drawing state immediately so the host can
@@ -8954,8 +8955,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       };
     }
 
-    function collectFutureActivityRequests(ctx) {
-      const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
+    function collectFutureActivityRequests(ctx, lookaheadSlides) {
       if (lookaheadSlides <= 0) return [];
 
       const seenInstanceKeys = new Set(collectRequestInstanceKeys(getActivityRequestForCurrentSlide(ctx)));
@@ -8985,20 +8985,23 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       return requests;
     }
 
-    function emitActivityPreloadRequest(ctx) {
-      if (ctx.state.role === 'student') return false;
-
+    function buildFutureActivityPreloadPayload(ctx) {
       const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
-      if (lookaheadSlides <= 0) return false;
+      if (lookaheadSlides <= 0) return null;
 
-      const requests = collectFutureActivityRequests(ctx);
-      if (!requests.length) return false;
+      const requests = collectFutureActivityRequests(ctx, lookaheadSlides);
+      if (!requests.length) return null;
 
-      const payload = {
+      return {
         indices: normalizeIndices(ctx.deck.getIndices()),
         lookaheadSlides,
         requests,
       };
+    }
+
+    function emitActivityPreloadRequest(ctx, payload) {
+      if (ctx.state.role === 'student') return false;
+      if (!payload) return false;
       safePostToParent(ctx, 'activityPreloadRequest', payload);
       logPreloadDebug(ctx, 'preload:request', {
         action: 'activityPreloadRequest',
@@ -9008,18 +9011,8 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       return true;
     }
 
-    function emitActivityBundlePreloadRequest(ctx) {
-      const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
-      if (lookaheadSlides <= 0) return false;
-
-      const requests = collectFutureActivityRequests(ctx);
-      if (!requests.length) return false;
-
-      const payload = {
-        indices: normalizeIndices(ctx.deck.getIndices()),
-        lookaheadSlides,
-        requests,
-      };
+    function emitActivityBundlePreloadRequest(ctx, payload) {
+      if (!payload) return false;
       safePostToParent(ctx, 'activityBundlePreloadRequest', payload);
       logPreloadDebug(ctx, 'preload:request', {
         action: 'activityBundlePreloadRequest',
@@ -10574,11 +10567,9 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       };
 
       const emitActivityPreload = () => {
-        emitActivityPreloadRequest(ctx);
-      };
-
-      const emitActivityBundlePreload = () => {
-        emitActivityBundlePreloadRequest(ctx);
+        const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+        emitActivityPreloadRequest(ctx, preloadPayload);
+        emitActivityBundlePreloadRequest(ctx, preloadPayload);
       };
 
       const enforcePauseLock = () => {
@@ -10616,7 +10607,6 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       deck.on('slidechanged', emitState);
       deck.on('slidechanged', emitActivityRequest);
       deck.on('slidechanged', emitActivityPreload);
-      deck.on('slidechanged', emitActivityBundlePreload);
       deck.on('slidechanged', flushChalkboardState);
       deck.on('fragmentshown', emitState);
       deck.on('fragmenthidden', emitState);
@@ -10862,7 +10852,6 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         deck.off('slidechanged', emitState);
         deck.off('slidechanged', emitActivityRequest);
         deck.off('slidechanged', emitActivityPreload);
-        deck.off('slidechanged', emitActivityBundlePreload);
         deck.off('slidechanged', flushChalkboardState);
         deck.off('fragmentshown', emitState);
         deck.off('fragmenthidden', emitState);
@@ -10891,14 +10880,6 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         if (!data || data.type !== ctx.config.messageType) return;
 
         if (ctx.config.deckId && data.deckId && data.deckId !== ctx.config.deckId) return;
-
-        if (data.action === 'activityPreloadResponse' || data.action === 'activityBundlePreloadResponse') {
-          logPreloadDebug(ctx, 'preload:response', {
-            action: data.action,
-            role: ctx.state.role,
-            payload: data.payload || {},
-          });
-        }
 
         if (data.action === 'command' && data.payload) {
           applyCommand(ctx, data.payload);
@@ -11019,7 +11000,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     var HOSTING_STYLE_ID = 'syncdeck-standalone-hosting-styles';
     var HOSTING_UI_ID = 'syncdeck-standalone-hosting';
     var HOSTING_CONTROLLER_GLOBAL_KEY = '__syncdeckStandaloneHostingController';
-    var DEFAULT_HOSTING_CTA_LABEL = 'Activate SyncDeck';
+    var DEFAULT_HOSTING_CTA_LABEL = 'Activate SyncDeck Student';
     var DEFAULT_HOSTING_ROUTE = '/util/syncdeck/launch-presentation';
 
     var REVEAL_DEFAULTS = {
