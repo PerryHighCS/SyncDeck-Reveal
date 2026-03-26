@@ -408,6 +408,56 @@ Library implementation expectations:
 - Preserve slide metadata payloads as opaque host input; do not make activity-specific decisions in the library.
 - Hosts may de-duplicate by `instanceKey`, so repeated emissions for the same anchored slide are expected to be idempotent.
 
+### `activityPreloadRequest`
+
+Sent by an **instructor** iframe to let the host prewarm upcoming embedded activity sessions
+before the instructor lands on the activity slide.
+
+The runtime scans forward by `iframeSync.activityPreloadLookaheadSlides` slide entries
+(default `2`), skipping fragment-only steps. Any future vertical-stack activity is grouped the
+same way as `activityRequest`, so hosts can preload the whole stack in one pass. Activities
+already covered by the current slide's launch request are excluded from the preload payload.
+
+```json
+{
+  "type": "reveal-sync",
+  "action": "activityPreloadRequest",
+  "payload": {
+    "indices": { "h": 0, "v": 0, "f": -1 },
+    "lookaheadSlides": 2,
+    "requests": [
+      {
+        "activityId": "video-sync",
+        "indices": { "h": 1, "v": 0, "f": -1 },
+        "instanceKey": "video-sync:1:0",
+        "activityOptions": {},
+        "trigger": "slide-enter",
+        "stackRequests": [
+          {
+            "activityId": "raffle",
+            "indices": { "h": 1, "v": 1, "f": -1 },
+            "instanceKey": "raffle:1:1",
+            "activityOptions": {},
+            "trigger": "slide-enter"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Payload fields:
+- `indices` (object): the instructor's current Reveal indices when the preload message was emitted.
+- `lookaheadSlides` (number): how many future slide entries the runtime scanned.
+- `requests` (array): future activity request groups using the same payload shape as `activityRequest`.
+
+Library implementation expectations:
+- Emit `activityPreloadRequest` only for the instructor role.
+- Skip fragment-only navigation when computing the future lookahead window.
+- Reuse the same stack grouping rules as `activityRequest`.
+- Exclude any future request whose `instanceKey` is already included in the current slide's launch group.
+
 ### `ready`
 
 Sent on init (if `autoAnnounceReady`) and when role changes.
