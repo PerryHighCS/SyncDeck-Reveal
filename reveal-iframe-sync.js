@@ -33,8 +33,10 @@
     allowedOrigins: ['*'],
     messageType: 'reveal-sync',
     autoAnnounceReady: true,
+    devMode: false,
     studentCanNavigateBack: true,
     studentCanNavigateForward: false,
+    activityPreloadLookaheadSlides: 2,
   };
 
   function normalizeOrigin(origin) {
@@ -98,6 +100,27 @@
 
   function debugLog(...args) {
     void args;
+  }
+
+  function readDevModeQueryFlag() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const value = params.get('devmode') ?? params.get('syncdeckDevMode');
+      if (value == null) return false;
+      const normalized = String(value).trim().toLowerCase();
+      return normalized === '' || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+    } catch {
+      return false;
+    }
+  }
+
+  function isDevModeEnabled(ctx) {
+    return !!ctx?.config?.devMode || readDevModeQueryFlag();
+  }
+
+  function logPreloadDebug(ctx, label, details) {
+    if (!isDevModeEnabled(ctx)) return;
+    console.log('[RevealIframeSync]', label, details);
   }
 
   function describeElement(element) {
@@ -265,6 +288,9 @@
     safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
     announceReady(ctx, readyReason);
     emitActivityRequestForCurrentSlide(ctx);
+    const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+    emitActivityPreloadRequest(ctx, preloadPayload);
+    emitActivityBundlePreloadRequest(ctx, preloadPayload);
 
     if (canBroadcastChalkboard(ctx)) {
       // Broadcast the current drawing state immediately so the host can
@@ -355,6 +381,15 @@
     return trimmedTrigger || 'slide-enter';
   }
 
+  function normalizeActivityPreloadLookahead(rawValue) {
+    const value = Number(rawValue);
+    if (!Number.isFinite(value) || value <= 0) {
+      return 0;
+    }
+
+    return Math.floor(value);
+  }
+
   function buildActivityRequestPayload(slide, indices) {
     if (!(slide instanceof Element)) return null;
 
@@ -373,14 +408,25 @@
     };
   }
 
-  function getActivityRequestForCurrentSlide(ctx) {
-    const currentIndices = normalizeIndices(ctx.deck.getIndices());
-    const currentSlide = ctx.deck.getCurrentSlide?.() || getSlideElement(currentIndices);
-    const primaryRequest = buildActivityRequestPayload(currentSlide, currentIndices);
+  function collectRequestInstanceKeys(request) {
+    if (!request) return [];
+
+    const stackRequests = Array.isArray(request.stackRequests) ? request.stackRequests : [];
+    return [
+      request.instanceKey,
+      ...stackRequests.map((entry) => entry.instanceKey),
+    ].filter((value) => typeof value === 'string' && value !== '');
+  }
+
+  function getActivityRequestForSlideIndices(indices, options) {
+    const resolvedIndices = normalizeIndices(indices);
+    const resolvedOptions = options || {};
+    const slide = resolvedOptions.slide || getSlideElement(resolvedIndices);
+    const primaryRequest = buildActivityRequestPayload(slide, resolvedIndices);
     if (!primaryRequest) return null;
 
     const topLevelSlides = document.querySelectorAll('.reveal .slides > section');
-    const topLevelSlide = topLevelSlides[currentIndices.h];
+    const topLevelSlide = topLevelSlides[resolvedIndices.h];
     const childSlides = Array.from(topLevelSlide?.querySelectorAll(':scope > section') || []);
     if (!childSlides.length) {
       return primaryRequest;
@@ -388,9 +434,9 @@
 
     const stackRequests = childSlides
       .map((slide, childIndex) => buildActivityRequestPayload(slide, {
-        h: currentIndices.h,
+        h: resolvedIndices.h,
         v: childIndex,
-        f: childIndex === currentIndices.v ? currentIndices.f : -1,
+        f: childIndex === resolvedIndices.v ? resolvedIndices.f : -1,
       }))
       .filter((request) => request && request.instanceKey !== primaryRequest.instanceKey);
 
@@ -404,6 +450,12 @@
     };
   }
 
+  function getActivityRequestForCurrentSlide(ctx) {
+    const currentIndices = normalizeIndices(ctx.deck.getIndices());
+    const currentSlide = ctx.deck.getCurrentSlide?.() || getSlideElement(currentIndices);
+    return getActivityRequestForSlideIndices(currentIndices, { slide: currentSlide });
+  }
+
   function emitActivityRequestForCurrentSlide(ctx) {
     if (ctx.state.role === 'student') return false;
 
@@ -411,6 +463,94 @@
     if (!payload) return false;
 
     safePostToParent(ctx, 'activityRequest', payload);
+    return true;
+  }
+
+  function stepIndicesNextSlide(indices) {
+    const current = normalizeIndices(indices);
+    const topLevelSlideCount = getTopLevelSlideCount();
+    if (topLevelSlideCount <= 0) return null;
+
+    const childSlideCount = getChildSlideCount(current.h);
+    if (childSlideCount > 0 && current.v < childSlideCount - 1) {
+      return { h: current.h, v: current.v + 1, f: -1 };
+    }
+
+    if (current.h >= topLevelSlideCount - 1) {
+      return null;
+    }
+
+    return {
+      h: current.h + 1,
+      v: 0,
+      f: -1,
+    };
+  }
+
+  function collectFutureActivityRequests(ctx, lookaheadSlides) {
+    if (lookaheadSlides <= 0) return [];
+
+    const seenInstanceKeys = new Set(collectRequestInstanceKeys(getActivityRequestForCurrentSlide(ctx)));
+    const requests = [];
+    let cursor = normalizeIndices(ctx.deck.getIndices());
+
+    for (let index = 0; index < lookaheadSlides; index += 1) {
+      cursor = stepIndicesNextSlide(cursor);
+      if (!cursor) break;
+
+      const request = getActivityRequestForSlideIndices(cursor);
+      if (!request) continue;
+
+      if (seenInstanceKeys.has(request.instanceKey)) {
+        collectRequestInstanceKeys(request).forEach((key) => {
+          seenInstanceKeys.add(key);
+        });
+        continue;
+      }
+
+      requests.push(request);
+      collectRequestInstanceKeys(request).forEach((key) => {
+        seenInstanceKeys.add(key);
+      });
+    }
+
+    return requests;
+  }
+
+  function buildFutureActivityPreloadPayload(ctx) {
+    const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
+    if (lookaheadSlides <= 0) return null;
+
+    const requests = collectFutureActivityRequests(ctx, lookaheadSlides);
+    if (!requests.length) return null;
+
+    return {
+      indices: normalizeIndices(ctx.deck.getIndices()),
+      lookaheadSlides,
+      requests,
+    };
+  }
+
+  function emitActivityPreloadRequest(ctx, payload) {
+    if (ctx.state.role === 'student') return false;
+    if (!payload) return false;
+    safePostToParent(ctx, 'activityPreloadRequest', payload);
+    logPreloadDebug(ctx, 'preload:request', {
+      action: 'activityPreloadRequest',
+      role: ctx.state.role,
+      payload,
+    });
+    return true;
+  }
+
+  function emitActivityBundlePreloadRequest(ctx, payload) {
+    if (!payload) return false;
+    safePostToParent(ctx, 'activityBundlePreloadRequest', payload);
+    logPreloadDebug(ctx, 'preload:request', {
+      action: 'activityBundlePreloadRequest',
+      role: ctx.state.role,
+      payload,
+    });
     return true;
   }
 
@@ -1958,6 +2098,12 @@
       emitActivityRequestForCurrentSlide(ctx);
     };
 
+    const emitActivityPreload = () => {
+      const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+      emitActivityPreloadRequest(ctx, preloadPayload);
+      emitActivityBundlePreloadRequest(ctx, preloadPayload);
+    };
+
     const enforcePauseLock = () => {
       if (ctx.state.applyingRemote) return;
       if (ctx.state.role !== 'student') return;
@@ -1992,6 +2138,7 @@
 
     deck.on('slidechanged', emitState);
     deck.on('slidechanged', emitActivityRequest);
+    deck.on('slidechanged', emitActivityPreload);
     deck.on('slidechanged', flushChalkboardState);
     deck.on('fragmentshown', emitState);
     deck.on('fragmenthidden', emitState);
@@ -2236,6 +2383,7 @@
       deck.off('fragmenthidden', enforceStudentBounds);
       deck.off('slidechanged', emitState);
       deck.off('slidechanged', emitActivityRequest);
+      deck.off('slidechanged', emitActivityPreload);
       deck.off('slidechanged', flushChalkboardState);
       deck.off('fragmentshown', emitState);
       deck.off('fragmenthidden', emitState);

@@ -52,6 +52,45 @@ test.describe('iframe host relay behavior', () => {
     );
   }
 
+  test('devMode logs preload requests', async ({ page }) => {
+    const consoleEntries = [];
+    page.on('console', async (message) => {
+      const values = await Promise.all(message.args().map(async (arg) => {
+        try {
+          return await arg.jsonValue();
+        } catch {
+          return null;
+        }
+      }));
+      consoleEntries.push({
+        text: message.text(),
+        values,
+      });
+    });
+
+    await page.addInitScript(() => {
+      window.__syncHarnessConfig = {
+        revealOptions: {
+          iframeSync: {
+            devMode: true,
+          },
+        },
+      };
+    });
+
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityBundlePreloadRequest'));
+    await expect.poll(() => consoleEntries.some((entry) => (
+      entry.values?.[0] === '[RevealIframeSync]'
+        && entry.values?.[1] === 'preload:request'
+        && entry.values?.[2]?.action === 'activityBundlePreloadRequest'
+    ))).toBe(true);
+  });
+
   test('host receives role and storyboard state messages from the iframe', async ({ page }) => {
     await gotoHost(page);
 
@@ -285,6 +324,132 @@ test.describe('iframe host relay behavior', () => {
           indices: { h: 1, v: 1, f: -1 },
           instanceKey: 'raffle:1:1',
           activityOptions: { cohort: 'b' },
+          trigger: 'slide-enter',
+        },
+      ],
+    });
+  });
+
+  test('host receives activityPreloadRequest for upcoming activity slides', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'instructor' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => (
+      entry.data?.action === 'activityPreloadRequest'
+        && entry.data?.payload?.indices?.h === 0
+    )));
+
+    const messages = await hostMessages(page);
+    const preloadRequest = findLastMessage(messages, 'activityPreloadRequest');
+    expect(preloadRequest?.data?.payload).toEqual({
+      indices: { h: 0, v: 0, f: -1 },
+      lookaheadSlides: 2,
+      requests: [
+        {
+          activityId: 'video-sync',
+          indices: { h: 1, v: 0, f: -1 },
+          instanceKey: 'video-sync:1:0',
+          activityOptions: { mode: 'conversion-smoke' },
+          trigger: 'slide-enter',
+          stackRequests: [
+            {
+              activityId: 'raffle',
+              indices: { h: 1, v: 1, f: -1 },
+              instanceKey: 'raffle:1:1',
+              activityOptions: { cohort: 'b' },
+              trigger: 'slide-enter',
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test('host receives activityBundlePreloadRequest for student-follow activity navigation', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityBundlePreloadRequest'));
+
+    const messages = await hostMessages(page);
+    const bundlePreloadRequest = findLastMessage(messages, 'activityBundlePreloadRequest');
+    expect(bundlePreloadRequest?.data?.role).toBe('student');
+    expect(bundlePreloadRequest?.data?.payload).toEqual({
+      indices: { h: 0, v: 0, f: -1 },
+      lookaheadSlides: 2,
+      requests: [
+        {
+          activityId: 'video-sync',
+          indices: { h: 1, v: 0, f: -1 },
+          instanceKey: 'video-sync:1:0',
+          activityOptions: { mode: 'conversion-smoke' },
+          trigger: 'slide-enter',
+          stackRequests: [
+            {
+              activityId: 'raffle',
+              indices: { h: 1, v: 1, f: -1 },
+              instanceKey: 'raffle:1:1',
+              activityOptions: { cohort: 'b' },
+              trigger: 'slide-enter',
+            },
+          ],
+        },
+      ],
+    });
+    expect(findLastMessage(messages, 'activityPreloadRequest')).toBeUndefined();
+  });
+
+  test('host receives activityPreloadRequest for hosted standalone activity navigation', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'slide', { h: 1, v: 0, f: -1 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityPreloadRequest'));
+
+    const messages = await hostMessages(page);
+    const preloadRequest = findLastMessage(messages, 'activityPreloadRequest');
+    expect(preloadRequest?.data?.role).toBe('standalone');
+    expect(preloadRequest?.data?.payload).toEqual({
+      indices: { h: 1, v: 0, f: -1 },
+      lookaheadSlides: 2,
+      requests: [
+        {
+          activityId: 'quiz-check',
+          indices: { h: 2, v: 0, f: -1 },
+          instanceKey: 'quiz-check:2:0',
+          activityOptions: { attempt: 'warmup' },
+          trigger: 'slide-enter',
+        },
+      ],
+    });
+  });
+
+  test('activityPreloadRequest skips activity instances already launched for the current stack', async ({ page }) => {
+    await gotoHost(page);
+
+    await postCommand(page, 'setRole', { role: 'instructor' });
+    await clearHostMessages(page);
+
+    await postCommand(page, 'slide', { h: 1, v: 0, f: -1 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityPreloadRequest'));
+
+    const messages = await hostMessages(page);
+    const preloadRequest = findLastMessage(messages, 'activityPreloadRequest');
+    expect(preloadRequest?.data?.payload).toEqual({
+      indices: { h: 1, v: 0, f: -1 },
+      lookaheadSlides: 2,
+      requests: [
+        {
+          activityId: 'quiz-check',
+          indices: { h: 2, v: 0, f: -1 },
+          instanceKey: 'quiz-check:2:0',
+          activityOptions: { attempt: 'warmup' },
           trigger: 'slide-enter',
         },
       ],
