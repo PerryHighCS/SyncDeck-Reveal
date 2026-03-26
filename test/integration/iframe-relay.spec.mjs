@@ -76,7 +76,6 @@ test.describe('iframe host relay behavior', () => {
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityBundlePreloadRequest'));
     await expect.poll(() => consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
 
-    expect(consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
     expect(consoleMessages.some((entry) => entry.includes('activityBundlePreloadRequest'))).toBe(true);
   });
 
