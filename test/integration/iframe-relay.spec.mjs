@@ -53,9 +53,19 @@ test.describe('iframe host relay behavior', () => {
   }
 
   test('devMode logs preload requests', async ({ page }) => {
-    const consoleMessages = [];
-    page.on('console', (message) => {
-      consoleMessages.push(message.text());
+    const consoleEntries = [];
+    page.on('console', async (message) => {
+      const values = await Promise.all(message.args().map(async (arg) => {
+        try {
+          return await arg.jsonValue();
+        } catch {
+          return null;
+        }
+      }));
+      consoleEntries.push({
+        text: message.text(),
+        values,
+      });
     });
 
     await page.addInitScript(() => {
@@ -74,9 +84,11 @@ test.describe('iframe host relay behavior', () => {
     await postCommand(page, 'setRole', { role: 'student' });
 
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityBundlePreloadRequest'));
-    await expect.poll(() => consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
-
-    expect(consoleMessages.some((entry) => entry.includes('activityBundlePreloadRequest'))).toBe(true);
+    await expect.poll(() => consoleEntries.some((entry) => (
+      entry.values?.[0] === '[RevealIframeSync]'
+        && entry.values?.[1] === 'preload:request'
+        && entry.values?.[2]?.action === 'activityBundlePreloadRequest'
+    ))).toBe(true);
   });
 
   test('host receives role and storyboard state messages from the iframe', async ({ page }) => {
