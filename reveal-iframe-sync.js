@@ -288,8 +288,9 @@
     safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
     announceReady(ctx, readyReason);
     emitActivityRequestForCurrentSlide(ctx);
-    emitActivityPreloadRequest(ctx);
-    emitActivityBundlePreloadRequest(ctx);
+    const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+    emitActivityPreloadRequest(ctx, preloadPayload);
+    emitActivityBundlePreloadRequest(ctx, preloadPayload);
 
     if (canBroadcastChalkboard(ctx)) {
       // Broadcast the current drawing state immediately so the host can
@@ -486,8 +487,7 @@
     };
   }
 
-  function collectFutureActivityRequests(ctx) {
-    const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
+  function collectFutureActivityRequests(ctx, lookaheadSlides) {
     if (lookaheadSlides <= 0) return [];
 
     const seenInstanceKeys = new Set(collectRequestInstanceKeys(getActivityRequestForCurrentSlide(ctx)));
@@ -517,20 +517,23 @@
     return requests;
   }
 
-  function emitActivityPreloadRequest(ctx) {
-    if (ctx.state.role === 'student') return false;
-
+  function buildFutureActivityPreloadPayload(ctx) {
     const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
-    if (lookaheadSlides <= 0) return false;
+    if (lookaheadSlides <= 0) return null;
 
-    const requests = collectFutureActivityRequests(ctx);
-    if (!requests.length) return false;
+    const requests = collectFutureActivityRequests(ctx, lookaheadSlides);
+    if (!requests.length) return null;
 
-    const payload = {
+    return {
       indices: normalizeIndices(ctx.deck.getIndices()),
       lookaheadSlides,
       requests,
     };
+  }
+
+  function emitActivityPreloadRequest(ctx, payload) {
+    if (ctx.state.role === 'student') return false;
+    if (!payload) return false;
     safePostToParent(ctx, 'activityPreloadRequest', payload);
     logPreloadDebug(ctx, 'preload:request', {
       action: 'activityPreloadRequest',
@@ -540,18 +543,8 @@
     return true;
   }
 
-  function emitActivityBundlePreloadRequest(ctx) {
-    const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
-    if (lookaheadSlides <= 0) return false;
-
-    const requests = collectFutureActivityRequests(ctx);
-    if (!requests.length) return false;
-
-    const payload = {
-      indices: normalizeIndices(ctx.deck.getIndices()),
-      lookaheadSlides,
-      requests,
-    };
+  function emitActivityBundlePreloadRequest(ctx, payload) {
+    if (!payload) return false;
     safePostToParent(ctx, 'activityBundlePreloadRequest', payload);
     logPreloadDebug(ctx, 'preload:request', {
       action: 'activityBundlePreloadRequest',
@@ -2106,11 +2099,9 @@
     };
 
     const emitActivityPreload = () => {
-      emitActivityPreloadRequest(ctx);
-    };
-
-    const emitActivityBundlePreload = () => {
-      emitActivityBundlePreloadRequest(ctx);
+      const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+      emitActivityPreloadRequest(ctx, preloadPayload);
+      emitActivityBundlePreloadRequest(ctx, preloadPayload);
     };
 
     const enforcePauseLock = () => {
@@ -2148,7 +2139,6 @@
     deck.on('slidechanged', emitState);
     deck.on('slidechanged', emitActivityRequest);
     deck.on('slidechanged', emitActivityPreload);
-    deck.on('slidechanged', emitActivityBundlePreload);
     deck.on('slidechanged', flushChalkboardState);
     deck.on('fragmentshown', emitState);
     deck.on('fragmenthidden', emitState);
@@ -2394,7 +2384,6 @@
       deck.off('slidechanged', emitState);
       deck.off('slidechanged', emitActivityRequest);
       deck.off('slidechanged', emitActivityPreload);
-      deck.off('slidechanged', emitActivityBundlePreload);
       deck.off('slidechanged', flushChalkboardState);
       deck.off('fragmentshown', emitState);
       deck.off('fragmenthidden', emitState);
