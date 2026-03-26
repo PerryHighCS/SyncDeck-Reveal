@@ -33,6 +33,7 @@
     allowedOrigins: ['*'],
     messageType: 'reveal-sync',
     autoAnnounceReady: true,
+    devMode: false,
     studentCanNavigateBack: true,
     studentCanNavigateForward: false,
     activityPreloadLookaheadSlides: 2,
@@ -99,6 +100,27 @@
 
   function debugLog(...args) {
     void args;
+  }
+
+  function readDevModeQueryFlag() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const value = params.get('devmode') || params.get('syncdeckDevMode');
+      if (value == null) return false;
+      const normalized = String(value).trim().toLowerCase();
+      return normalized === '' || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+    } catch {
+      return false;
+    }
+  }
+
+  function isDevModeEnabled(ctx) {
+    return !!ctx?.config?.devMode || readDevModeQueryFlag();
+  }
+
+  function logPreloadDebug(ctx, label, details) {
+    if (!isDevModeEnabled(ctx)) return;
+    console.log('[RevealIframeSync]', label, details);
   }
 
   function describeElement(element) {
@@ -504,10 +526,16 @@
     const requests = collectFutureActivityRequests(ctx);
     if (!requests.length) return false;
 
-    safePostToParent(ctx, 'activityPreloadRequest', {
+    const payload = {
       indices: normalizeIndices(ctx.deck.getIndices()),
       lookaheadSlides,
       requests,
+    };
+    safePostToParent(ctx, 'activityPreloadRequest', payload);
+    logPreloadDebug(ctx, 'preload:request', {
+      action: 'activityPreloadRequest',
+      role: ctx.state.role,
+      payload,
     });
     return true;
   }
@@ -519,10 +547,16 @@
     const requests = collectFutureActivityRequests(ctx);
     if (!requests.length) return false;
 
-    safePostToParent(ctx, 'activityBundlePreloadRequest', {
+    const payload = {
       indices: normalizeIndices(ctx.deck.getIndices()),
       lookaheadSlides,
       requests,
+    };
+    safePostToParent(ctx, 'activityBundlePreloadRequest', payload);
+    logPreloadDebug(ctx, 'preload:request', {
+      action: 'activityBundlePreloadRequest',
+      role: ctx.state.role,
+      payload,
     });
     return true;
   }
@@ -2389,6 +2423,14 @@
       if (!data || data.type !== ctx.config.messageType) return;
 
       if (ctx.config.deckId && data.deckId && data.deckId !== ctx.config.deckId) return;
+
+      if (data.action === 'activityPreloadResponse' || data.action === 'activityBundlePreloadResponse') {
+        logPreloadDebug(ctx, 'preload:response', {
+          action: data.action,
+          role: ctx.state.role,
+          payload: data.payload || {},
+        });
+      }
 
       if (data.action === 'command' && data.payload) {
         applyCommand(ctx, data.payload);

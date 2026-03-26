@@ -52,6 +52,51 @@ test.describe('iframe host relay behavior', () => {
     );
   }
 
+  test('devMode logs preload requests and preload responses', async ({ page }) => {
+    const consoleMessages = [];
+    page.on('console', (message) => {
+      consoleMessages.push(message.text());
+    });
+
+    await page.addInitScript(() => {
+      window.__syncHarnessConfig = {
+        revealOptions: {
+          iframeSync: {
+            devMode: true,
+          },
+        },
+      };
+    });
+
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'setRole', { role: 'student' });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityBundlePreloadRequest'));
+    await expect.poll(() => consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
+
+    await page.evaluate(() => {
+      const frame = window.__hostHarness.frame;
+      frame.contentWindow.postMessage({
+        type: 'reveal-sync',
+        action: 'activityBundlePreloadResponse',
+        deckId: 'fixture-deck',
+        payload: {
+          ok: true,
+          activityId: 'video-sync',
+        },
+      }, '*');
+    });
+
+    await expect.poll(() => consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:response'))).toBe(true);
+
+    expect(consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
+    expect(consoleMessages.some((entry) => entry.includes('activityBundlePreloadRequest'))).toBe(true);
+    expect(consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:response'))).toBe(true);
+    expect(consoleMessages.some((entry) => entry.includes('activityBundlePreloadResponse'))).toBe(true);
+  });
+
   test('host receives role and storyboard state messages from the iframe', async ({ page }) => {
     await gotoHost(page);
 
