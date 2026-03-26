@@ -8735,6 +8735,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       announceReady(ctx, readyReason);
       emitActivityRequestForCurrentSlide(ctx);
       emitActivityPreloadRequest(ctx);
+      emitActivityBundlePreloadRequest(ctx);
 
       if (canBroadcastChalkboard(ctx)) {
         // Broadcast the current drawing state immediately so the host can
@@ -8963,7 +8964,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     }
 
     function emitActivityPreloadRequest(ctx) {
-      if (ctx.state.role !== 'instructor') return false;
+      if (ctx.state.role === 'student') return false;
 
       const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
       if (lookaheadSlides <= 0) return false;
@@ -8972,6 +8973,21 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       if (!requests.length) return false;
 
       safePostToParent(ctx, 'activityPreloadRequest', {
+        indices: normalizeIndices(ctx.deck.getIndices()),
+        lookaheadSlides,
+        requests,
+      });
+      return true;
+    }
+
+    function emitActivityBundlePreloadRequest(ctx) {
+      const lookaheadSlides = normalizeActivityPreloadLookahead(ctx.config.activityPreloadLookaheadSlides);
+      if (lookaheadSlides <= 0) return false;
+
+      const requests = collectFutureActivityRequests(ctx);
+      if (!requests.length) return false;
+
+      safePostToParent(ctx, 'activityBundlePreloadRequest', {
         indices: normalizeIndices(ctx.deck.getIndices()),
         lookaheadSlides,
         requests,
@@ -10527,6 +10543,10 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         emitActivityPreloadRequest(ctx);
       };
 
+      const emitActivityBundlePreload = () => {
+        emitActivityBundlePreloadRequest(ctx);
+      };
+
       const enforcePauseLock = () => {
         if (ctx.state.applyingRemote) return;
         if (ctx.state.role !== 'student') return;
@@ -10562,6 +10582,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       deck.on('slidechanged', emitState);
       deck.on('slidechanged', emitActivityRequest);
       deck.on('slidechanged', emitActivityPreload);
+      deck.on('slidechanged', emitActivityBundlePreload);
       deck.on('slidechanged', flushChalkboardState);
       deck.on('fragmentshown', emitState);
       deck.on('fragmenthidden', emitState);
@@ -10807,6 +10828,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         deck.off('slidechanged', emitState);
         deck.off('slidechanged', emitActivityRequest);
         deck.off('slidechanged', emitActivityPreload);
+        deck.off('slidechanged', emitActivityBundlePreload);
         deck.off('slidechanged', flushChalkboardState);
         deck.off('fragmentshown', emitState);
         deck.off('fragmenthidden', emitState);
