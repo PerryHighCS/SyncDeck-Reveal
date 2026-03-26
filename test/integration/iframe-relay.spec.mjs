@@ -52,7 +52,7 @@ test.describe('iframe host relay behavior', () => {
     );
   }
 
-  test('devMode logs preload requests and preload responses', async ({ page }) => {
+  test('devMode logs preload requests', async ({ page }) => {
     const consoleMessages = [];
     page.on('console', (message) => {
       consoleMessages.push(message.text());
@@ -76,25 +76,8 @@ test.describe('iframe host relay behavior', () => {
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityBundlePreloadRequest'));
     await expect.poll(() => consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
 
-    await page.evaluate(() => {
-      const frame = window.__hostHarness.frame;
-      frame.contentWindow.postMessage({
-        type: 'reveal-sync',
-        action: 'activityBundlePreloadResponse',
-        deckId: 'fixture-deck',
-        payload: {
-          ok: true,
-          activityId: 'video-sync',
-        },
-      }, '*');
-    });
-
-    await expect.poll(() => consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:response'))).toBe(true);
-
     expect(consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:request'))).toBe(true);
     expect(consoleMessages.some((entry) => entry.includes('activityBundlePreloadRequest'))).toBe(true);
-    expect(consoleMessages.some((entry) => entry.includes('[RevealIframeSync] preload:response'))).toBe(true);
-    expect(consoleMessages.some((entry) => entry.includes('activityBundlePreloadResponse'))).toBe(true);
   });
 
   test('host receives role and storyboard state messages from the iframe', async ({ page }) => {
@@ -342,7 +325,10 @@ test.describe('iframe host relay behavior', () => {
     await clearHostMessages(page);
     await postCommand(page, 'setRole', { role: 'instructor' });
 
-    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityPreloadRequest'));
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => (
+      entry.data?.action === 'activityPreloadRequest'
+        && entry.data?.payload?.indices?.h === 0
+    )));
 
     const messages = await hostMessages(page);
     const preloadRequest = findLastMessage(messages, 'activityPreloadRequest');

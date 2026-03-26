@@ -105,7 +105,7 @@
   function readDevModeQueryFlag() {
     try {
       const params = new URLSearchParams(window.location.search);
-      const value = params.get('devmode') || params.get('syncdeckDevMode');
+      const value = params.get('devmode') ?? params.get('syncdeckDevMode');
       if (value == null) return false;
       const normalized = String(value).trim().toLowerCase();
       return normalized === '' || normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
@@ -2412,14 +2412,6 @@
       if (!data || data.type !== ctx.config.messageType) return;
 
       if (ctx.config.deckId && data.deckId && data.deckId !== ctx.config.deckId) return;
-
-      if (data.action === 'activityPreloadResponse' || data.action === 'activityBundlePreloadResponse') {
-        logPreloadDebug(ctx, 'preload:response', {
-          action: data.action,
-          role: ctx.state.role,
-          payload: data.payload || {},
-        });
-      }
 
       if (data.action === 'command' && data.payload) {
         applyCommand(ctx, data.payload);
