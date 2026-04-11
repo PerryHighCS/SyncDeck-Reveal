@@ -181,6 +181,64 @@ test('installs the shared image lightbox with delegated clicks and legacy global
   });
 });
 
+test('moves focus into the lightbox and restores it on close', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+  const focusState = await page.evaluate(() => {
+    const trigger = document.createElement('button');
+    trigger.id = 'lightbox-focus-trigger';
+    trigger.type = 'button';
+    trigger.textContent = 'Focus trigger';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    document.querySelector('.img-zoomable').click();
+    const focusedAfterOpen = document.activeElement && document.activeElement.id;
+    window.closeImgModal();
+
+    return {
+      focusedAfterOpen,
+      focusedAfterClose: document.activeElement && document.activeElement.id,
+    };
+  });
+
+  expect(focusState).toEqual({
+    focusedAfterOpen: 'img-modal-close',
+    focusedAfterClose: 'lightbox-focus-trigger',
+  });
+});
+
+test('destroys the shared image lightbox when disabled during reinit', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+  const disabledState = await page.evaluate(async () => {
+    window.openImgModal('disable-reinit.png', 'Disable reinit');
+    await window.runBootstrapHarness({ imageLightbox: false });
+
+    const modal = document.getElementById('img-modal');
+    const image = document.getElementById('img-modal-img');
+    document.querySelector('.img-zoomable').click();
+
+    return {
+      controllerCleared: !window.__syncdeckImageLightboxController,
+      open: modal.classList.contains('open'),
+      ariaHidden: modal.getAttribute('aria-hidden'),
+      src: image.getAttribute('src'),
+      alt: image.alt,
+    };
+  });
+
+  expect(disabledState).toEqual({
+    controllerCleared: true,
+    open: false,
+    ariaHidden: 'true',
+    src: null,
+    alt: '',
+  });
+});
+
 test('keeps legacy open modal state dismissible during init and reinit', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

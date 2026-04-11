@@ -165,6 +165,7 @@
             plugins: opts.includeCustomPlugins ? customPlugins : undefined,
           },
           chalkboardOverrides: opts.chalkboardOverrides || {},
+          imageLightbox: opts.imageLightbox,
           standaloneHosting: opts.standaloneHosting ? Object.assign({}, opts.standaloneHosting, {
             navigate: function (url) {
               window.__bootstrapHarness.launchCalls.push(String(url));

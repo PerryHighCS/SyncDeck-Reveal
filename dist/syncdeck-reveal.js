@@ -11075,14 +11075,28 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       var image = elements.image;
       var closeButton = elements.closeButton;
       var active = true;
+      var previouslyFocusedElement = null;
+
+      function focusElement(element) {
+        if (!element || typeof element.focus !== 'function') return;
+        try {
+          element.focus({ preventScroll: true });
+        } catch {
+          element.focus();
+        }
+      }
 
       function open(src, alt) {
         if (!active || !src) return;
+        if (!modal.classList.contains('open')) {
+          previouslyFocusedElement = document.activeElement;
+        }
         image.src = src;
         image.alt = alt || '';
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
         document.addEventListener('keydown', onKeydown);
+        focusElement(closeButton);
       }
 
       function openImage(img) {
@@ -11095,6 +11109,10 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         modal.classList.remove('open');
         modal.setAttribute('aria-hidden', 'true');
         document.removeEventListener('keydown', onKeydown);
+        if (previouslyFocusedElement && document.contains(previouslyFocusedElement)) {
+          focusElement(previouslyFocusedElement);
+        }
+        previouslyFocusedElement = null;
       }
 
       function resetModal() {
@@ -11765,7 +11783,14 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         });
       }
 
-      if (cfg.imageLightbox !== false && typeof global.initSyncDeckImageLightbox === 'function') {
+      if (cfg.imageLightbox === false) {
+        if (
+          global.__syncdeckImageLightboxController &&
+          typeof global.__syncdeckImageLightboxController.destroy === 'function'
+        ) {
+          global.__syncdeckImageLightboxController.destroy();
+        }
+      } else if (typeof global.initSyncDeckImageLightbox === 'function') {
         global.initSyncDeckImageLightbox();
       }
 
