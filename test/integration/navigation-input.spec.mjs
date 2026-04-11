@@ -2322,6 +2322,68 @@ test('instructor right-arrow and right control reveal fragments before horizonta
   });
 });
 
+test('instructor sees a last-fragment cue and fragment boundary API updates', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => {
+    window.__fragmentBoundaryEvents = [];
+    window.addEventListener('syncdeck-fragment-boundary-change', (event) => {
+      window.__fragmentBoundaryEvents.push(event.detail);
+    });
+
+    window.RevealIframeSyncAPI.setRole('instructor');
+    window.Reveal.slide(2, 0, -1);
+  });
+
+  await page.waitForFunction(() => {
+    const boundary = window.RevealIframeSyncAPI.getFragmentBoundary();
+    return boundary.indices.h === 2
+      && boundary.fragmentIndex === -1
+      && boundary.fragmentCount === 3
+      && boundary.beforeFirstFragment === true
+      && boundary.atLastFragment === false;
+  });
+
+  const cue = page.locator('[data-syncdeck-fragment-boundary-cue="true"]');
+  await expect(cue).toBeVisible();
+  await expect(cue).toHaveAttribute('data-syncdeck-complete', 'false');
+
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const boundary = window.RevealIframeSyncAPI.getFragmentBoundary();
+    return boundary.indices.h === 2
+      && boundary.fragmentIndex === 2
+      && boundary.fragmentCount === 3
+      && boundary.visibleFragmentCount === 3
+      && boundary.atLastFragment === true
+      && boundary.nextWillChangeSlide === true;
+  });
+
+  await expect(cue).toBeVisible();
+  await expect(cue).toHaveAttribute('data-syncdeck-complete', 'true');
+  await expect(page.locator('body')).toHaveAttribute('data-syncdeck-last-fragment', 'true');
+
+  const lastFragmentEvent = await page.evaluate(() => window.__fragmentBoundaryEvents.at(-1));
+  expect(lastFragmentEvent.role).toBe('instructor');
+  expect(lastFragmentEvent.indices).toEqual({ h: 2, v: 0, f: 2 });
+  expect(lastFragmentEvent.atLastFragment).toBe(true);
+
+  await page.keyboard.press('ArrowRight');
+
+  await page.waitForFunction(() => {
+    const boundary = window.RevealIframeSyncAPI.getFragmentBoundary();
+    return boundary.indices.h === 3
+      && boundary.fragmentCount === 0
+      && boundary.atLastFragment === false;
+  });
+
+  await expect(cue).toBeHidden();
+  await expect(page.locator('body')).toHaveAttribute('data-syncdeck-last-fragment', 'false');
+});
+
 test('up/down navigation stays vertical and does not consume fragments', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 

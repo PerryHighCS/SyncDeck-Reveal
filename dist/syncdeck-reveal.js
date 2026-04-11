@@ -8506,6 +8506,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       studentCanNavigateBack: true,
       studentCanNavigateForward: false,
       activityPreloadLookaheadSlides: 2,
+      lastFragmentIndicator: true,
     };
 
     function normalizeOrigin(origin) {
@@ -8663,6 +8664,43 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       .reveal .fragment.syncdeck-suppressed-future {
         opacity: 0 !important;
         visibility: hidden !important;
+      }
+
+      .syncdeck-fragment-boundary-cue {
+        position: fixed;
+        right: 18px;
+        bottom: 42px;
+        z-index: 2147483000;
+        width: 45px;
+        height: 12px;
+        background:
+          radial-gradient(circle, rgba(0, 0, 0, 0.82) 0 3.2px, rgba(255, 255, 255, 0.92) 3.7px 5.2px, transparent 5.7px)
+          0 50% / 15px 12px repeat-x;
+        filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.42));
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(2px);
+        transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .syncdeck-fragment-boundary-cue[data-syncdeck-visible="true"] {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .syncdeck-fragment-boundary-cue[data-syncdeck-complete="true"] {
+        background:
+          radial-gradient(circle, #f2c94c 0 3px, rgba(0, 0, 0, 0.82) 3.5px 4.5px, rgba(255, 255, 255, 0.9) 5px 5.8px, transparent 6.2px)
+          0 50% / 15px 12px repeat-x;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .syncdeck-fragment-boundary-cue {
+          transition: none;
+        }
       }
     `;
 
@@ -9037,6 +9075,66 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       const slide = getSlideElement(indices);
       if (!slide) return 0;
       return slide.querySelectorAll('.fragment').length;
+    }
+
+    function buildFragmentBoundaryPayload(ctx) {
+      const indices = normalizeIndices(ctx.deck.getIndices());
+      const fragmentCount = getFragmentCount(indices);
+      const hasFragments = fragmentCount > 0;
+      const fragmentIndex = hasFragments
+        ? Math.max(-1, Math.min(fragmentCount - 1, indices.f))
+        : -1;
+
+      return {
+        role: ctx.state.role,
+        indices,
+        hasFragments,
+        fragmentIndex,
+        fragmentCount,
+        visibleFragmentCount: hasFragments ? Math.max(0, fragmentIndex + 1) : 0,
+        beforeFirstFragment: hasFragments && fragmentIndex < 0,
+        atFirstFragment: hasFragments && fragmentIndex === 0,
+        atLastFragment: hasFragments && fragmentIndex >= fragmentCount - 1,
+        nextWillChangeSlide: !hasFragments || fragmentIndex >= fragmentCount - 1,
+      };
+    }
+
+    function ensureFragmentBoundaryCue(ctx) {
+      if (ctx.state.fragmentBoundaryCueEl?.isConnected) return ctx.state.fragmentBoundaryCueEl;
+
+      const cue = document.createElement('div');
+      cue.className = 'syncdeck-fragment-boundary-cue';
+      cue.setAttribute('data-syncdeck-fragment-boundary-cue', 'true');
+      cue.setAttribute('data-syncdeck-visible', 'false');
+      cue.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(cue);
+      ctx.state.fragmentBoundaryCueEl = cue;
+      return cue;
+    }
+
+    function updateFragmentBoundaryState(ctx, options) {
+      const detail = buildFragmentBoundaryPayload(ctx);
+      const indicatorEnabled = ctx.config.lastFragmentIndicator !== false;
+      const shouldShowCue = indicatorEnabled
+        && detail.hasFragments;
+      const cue = indicatorEnabled ? ensureFragmentBoundaryCue(ctx) : ctx.state.fragmentBoundaryCueEl;
+
+      document.body?.setAttribute('data-syncdeck-fragment-boundary', detail.atLastFragment ? 'last' : 'none');
+      document.body?.setAttribute('data-syncdeck-last-fragment', detail.atLastFragment ? 'true' : 'false');
+
+      if (cue) {
+        cue.setAttribute('data-syncdeck-visible', shouldShowCue ? 'true' : 'false');
+        cue.setAttribute('data-syncdeck-complete', detail.atLastFragment ? 'true' : 'false');
+        cue.setAttribute('aria-hidden', 'true');
+      }
+
+      const signature = JSON.stringify(detail);
+      if (signature !== ctx.state.lastFragmentBoundarySignature) {
+        ctx.state.lastFragmentBoundarySignature = signature;
+        window.dispatchEvent(new CustomEvent('syncdeck-fragment-boundary-change', { detail }));
+      }
+
+      return detail;
     }
 
     function stepIndicesNext(indices) {
@@ -9515,6 +9613,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
     function updateNavigationControls(ctx) {
       ensureNavLockStyles();
+      updateFragmentBoundaryState(ctx);
 
       const nav = buildNavigationStatus(ctx);
       const isUnrestricted = ctx.state.role === 'instructor' || ctx.state.role === 'standalone';
@@ -10924,6 +11023,8 @@ Please report this to https://github.com/markedjs/marked.`, r) {
           releaseEndH: null,
           standaloneControlRefreshTimer: null,
           lastPublishedMetadata: null,
+          fragmentBoundaryCueEl: null,
+          lastFragmentBoundarySignature: null,
         },
       };
 
@@ -10949,6 +11050,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         getStudentBoundary: () => getStudentBoundary(ctx),
         getCapabilities: () => getRoleCapabilities(ctx),
         getStatus: () => buildSyncStatusPayload(ctx, 'apiGetStatus'),
+        getFragmentBoundary: () => buildFragmentBoundaryPayload(ctx),
         getMetadata: () => getPresentationMetadata(),
         setRole: (role) => {
           applyRoleChange(ctx, role, 'apiSetRole');
@@ -10971,6 +11073,10 @@ Please report this to https://github.com/markedjs/marked.`, r) {
           if (ctx.state.pauseOverlayEl) {
             ctx.state.pauseOverlayEl.remove();
             ctx.state.pauseOverlayEl = null;
+          }
+          if (ctx.state.fragmentBoundaryCueEl) {
+            ctx.state.fragmentBoundaryCueEl.remove();
+            ctx.state.fragmentBoundaryCueEl = null;
           }
           ctx.cleanup.forEach((fn) => fn());
           ctx.cleanup = [];
