@@ -8784,7 +8784,6 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
       // Update navigation controls to reflect new role.
       updateNavigationControls(ctx);
-      updateFragmentBoundaryState(ctx);
       safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
       announceReady(ctx, readyReason);
       emitActivityRequestForCurrentSlide(ctx);
@@ -9108,8 +9107,6 @@ Please report this to https://github.com/markedjs/marked.`, r) {
     }
 
     function updateFragmentBoundaryState(ctx, options) {
-      ensureNavLockStyles();
-
       const detail = buildFragmentBoundaryPayload(ctx);
       const indicatorEnabled = ctx.config.lastFragmentIndicator !== false;
       const shouldShowCue = indicatorEnabled
@@ -9121,7 +9118,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
       if (cue) {
         cue.setAttribute('data-syncdeck-visible', shouldShowCue ? 'true' : 'false');
-        cue.setAttribute('aria-hidden', shouldShowCue ? 'false' : 'true');
+        cue.setAttribute('aria-hidden', 'true');
       }
 
       const signature = JSON.stringify(detail);

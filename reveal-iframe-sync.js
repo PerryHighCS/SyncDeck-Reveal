@@ -316,7 +316,6 @@
 
     // Update navigation controls to reflect new role.
     updateNavigationControls(ctx);
-    updateFragmentBoundaryState(ctx);
     safePostToParent(ctx, 'roleChanged', { role: ctx.state.role });
     announceReady(ctx, readyReason);
     emitActivityRequestForCurrentSlide(ctx);
@@ -640,8 +639,6 @@
   }
 
   function updateFragmentBoundaryState(ctx, options) {
-    ensureNavLockStyles();
-
     const detail = buildFragmentBoundaryPayload(ctx);
     const indicatorEnabled = ctx.config.lastFragmentIndicator !== false;
     const shouldShowCue = indicatorEnabled
@@ -653,7 +650,7 @@
 
     if (cue) {
       cue.setAttribute('data-syncdeck-visible', shouldShowCue ? 'true' : 'false');
-      cue.setAttribute('aria-hidden', shouldShowCue ? 'false' : 'true');
+      cue.setAttribute('aria-hidden', 'true');
     }
 
     const signature = JSON.stringify(detail);
