@@ -91,15 +91,19 @@
     }
 
     function open(src, alt) {
+      var wasOpen;
       if (!active || !src) return;
-      if (!modal.classList.contains('open')) {
+      wasOpen = modal.classList.contains('open');
+      if (!wasOpen) {
         previouslyFocusedElement = document.activeElement;
       }
       image.src = src;
       image.alt = alt || '';
       modal.classList.add('open');
       modal.setAttribute('aria-hidden', 'false');
-      document.addEventListener('keydown', onKeydown);
+      if (!wasOpen) {
+        document.addEventListener('keydown', onKeydown);
+      }
       focusElement(closeButton);
     }
 

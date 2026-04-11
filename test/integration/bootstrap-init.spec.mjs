@@ -209,6 +209,48 @@ test('moves focus into the lightbox and restores it on close', async ({ page }) 
   });
 });
 
+test('does not rebind Escape listener when opening an already open lightbox', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+  const listenerState = await page.evaluate(() => {
+    const originalAddEventListener = document.addEventListener.bind(document);
+    const originalRemoveEventListener = document.removeEventListener.bind(document);
+    let keydownAdds = 0;
+    let keydownRemoves = 0;
+
+    document.addEventListener = function (type, listener, options) {
+      if (type === 'keydown') keydownAdds += 1;
+      return originalAddEventListener(type, listener, options);
+    };
+    document.removeEventListener = function (type, listener, options) {
+      if (type === 'keydown') keydownRemoves += 1;
+      return originalRemoveEventListener(type, listener, options);
+    };
+
+    window.openImgModal('first-preview.png', 'First preview');
+    window.openImgModal('second-preview.png', 'Second preview');
+    const image = document.getElementById('img-modal-img');
+    const openedAlt = image.alt;
+    window.closeImgModal();
+
+    document.addEventListener = originalAddEventListener;
+    document.removeEventListener = originalRemoveEventListener;
+
+    return {
+      keydownAdds,
+      keydownRemoves,
+      openedAlt,
+    };
+  });
+
+  expect(listenerState).toEqual({
+    keydownAdds: 1,
+    keydownRemoves: 1,
+    openedAlt: 'Second preview',
+  });
+});
+
 test('destroys the shared image lightbox when disabled during reinit', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
