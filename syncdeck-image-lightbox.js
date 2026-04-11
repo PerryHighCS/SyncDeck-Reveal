@@ -101,6 +101,12 @@
       document.removeEventListener('keydown', onKeydown);
     }
 
+    function resetModal() {
+      close();
+      image.removeAttribute('src');
+      image.alt = '';
+    }
+
     function onDocumentClick(event) {
       var imageTarget = closestZoomableImage(event.target);
       if (!imageTarget) return;
@@ -118,19 +124,27 @@
     closeButton.addEventListener('click', close);
     modal.addEventListener('click', onModalClick);
     document.addEventListener('click', onDocumentClick);
-    modal.setAttribute('aria-hidden', modal.classList.contains('open') ? 'false' : 'true');
 
-    return {
+    var isInitiallyOpen = modal.classList.contains('open');
+    modal.setAttribute('aria-hidden', isInitiallyOpen ? 'false' : 'true');
+    if (isInitiallyOpen) {
+      document.addEventListener('keydown', onKeydown);
+    } else {
+      document.removeEventListener('keydown', onKeydown);
+    }
+
+    var controller = {
       open: open,
       openImage: openImage,
       close: close,
       destroy: function () {
+        resetModal();
         active = false;
         document.removeEventListener('click', onDocumentClick);
         document.removeEventListener('keydown', onKeydown);
         modal.removeEventListener('click', onModalClick);
         closeButton.removeEventListener('click', close);
-        if (global[CONTROLLER_GLOBAL_KEY] === this) {
+        if (global[CONTROLLER_GLOBAL_KEY] === controller) {
           global[CONTROLLER_GLOBAL_KEY] = null;
         }
       },
@@ -138,6 +152,8 @@
         return modal;
       },
     };
+
+    return controller;
   }
 
   function initSyncDeckImageLightbox() {

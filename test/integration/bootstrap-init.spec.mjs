@@ -181,6 +181,66 @@ test('installs the shared image lightbox with delegated clicks and legacy global
   });
 });
 
+test('keeps legacy open modal state dismissible during init and reinit', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const initializedOpenState = await page.evaluate(() => {
+    const modal = document.createElement('div');
+    modal.id = 'img-modal';
+    modal.className = 'open';
+    const image = document.createElement('img');
+    image.id = 'img-modal-img';
+    image.src = 'legacy-open.png';
+    image.alt = 'Legacy open';
+    modal.appendChild(image);
+    document.body.appendChild(modal);
+    window.initSyncDeckImageLightbox();
+    return modal.getAttribute('aria-hidden');
+  });
+
+  expect(initializedOpenState).toBe('false');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
+  await expect(page.locator('#img-modal')).toHaveAttribute('aria-hidden', 'true');
+
+  const reinitState = await page.evaluate(() => {
+    window.openImgModal('reinit-open.png', 'Reinit open');
+    const previousController = window.__syncdeckImageLightboxController;
+    const unboundDestroy = previousController.destroy;
+    unboundDestroy();
+    const modal = document.getElementById('img-modal');
+    const image = document.getElementById('img-modal-img');
+    const stateAfterUnboundDestroy = {
+      open: modal.classList.contains('open'),
+      ariaHidden: modal.getAttribute('aria-hidden'),
+      src: image.getAttribute('src'),
+      alt: image.alt,
+      globalCleared: !window.__syncdeckImageLightboxController,
+    };
+
+    window.openImgModal('after-reinit.png', 'After reinit');
+    const reopened = modal.classList.contains('open') && image.alt === 'After reinit';
+    window.closeImgModal();
+    return {
+      stateAfterUnboundDestroy,
+      reopened,
+      closed: !modal.classList.contains('open'),
+    };
+  });
+
+  expect(reinitState).toEqual({
+    stateAfterUnboundDestroy: {
+      open: false,
+      ariaHidden: 'true',
+      src: null,
+      alt: '',
+      globalCleared: true,
+    },
+    reopened: true,
+    closed: true,
+  });
+});
+
 test('strips chalkboard storage and emits an explicit warning', async ({ page }) => {
   await page.goto(fixtureUrl.toString());
 
