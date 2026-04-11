@@ -587,6 +587,10 @@
       });
     }
 
+    if (cfg.imageLightbox !== false && typeof global.initSyncDeckImageLightbox === 'function') {
+      global.initSyncDeckImageLightbox();
+    }
+
     if (typeof afterInit === 'function') {
       if (initResult && typeof initResult.then === 'function') {
         initResult.then(

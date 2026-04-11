@@ -19,6 +19,7 @@ test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
     bootstrapInitType: typeof window.initSyncDeckReveal,
     buildLaunchUrlType: typeof window.buildSyncDeckLaunchUrl,
     launchPresentationType: typeof window.launchPresentationInSyncDeck,
+    imageLightboxInitType: typeof window.initSyncDeckImageLightbox,
   }));
 
   expect(globals.revealLoaded).toBe(true);
@@ -29,6 +30,7 @@ test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
   expect(globals.bootstrapInitType).toBe('function');
   expect(globals.buildLaunchUrlType).toBe('function');
   expect(globals.launchPresentationType).toBe('function');
+  expect(globals.imageLightboxInitType).toBe('function');
 });
 
 test('preserves custom plugins while appending required SyncDeck plugins', async ({ page }) => {
@@ -124,6 +126,54 @@ test('logs and contains async afterInit callback rejections', async ({ page }) =
 
   expect(result.initRejected).toBe(false);
   expect(result.errors.some((line) => line.includes('afterInit callback failed'))).toBe(true);
+});
+
+test('installs the shared image lightbox with delegated clicks and legacy globals', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+
+  await expect(page.locator('#img-modal')).toHaveAttribute('aria-hidden', 'true');
+  await page.locator('.img-zoomable').first().evaluate((image) => image.click());
+  await expect(page.locator('#img-modal')).toHaveClass(/open/);
+  await expect(page.locator('#img-modal')).toHaveAttribute('aria-hidden', 'false');
+  await expect(page.locator('#img-modal-img')).toHaveAttribute('alt', 'Fixture zoom target');
+
+  const imageFrameStyle = await page.locator('#img-modal-img').evaluate((image) => {
+    const style = window.getComputedStyle(image);
+    return {
+      backgroundColor: style.backgroundColor,
+      boxSizing: style.boxSizing,
+      paddingTop: style.paddingTop,
+    };
+  });
+  expect(imageFrameStyle).toEqual({
+    backgroundColor: 'rgb(255, 255, 255)',
+    boxSizing: 'border-box',
+    paddingTop: '10px',
+  });
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
+
+  const legacyResult = await page.evaluate(() => {
+    window.openImgModal('legacy-preview.png', 'Legacy preview');
+    const modal = document.getElementById('img-modal');
+    const image = document.getElementById('img-modal-img');
+    const opened = modal.classList.contains('open') && image.getAttribute('alt') === 'Legacy preview';
+    window.closeImgModal();
+    return {
+      opened,
+      closed: !modal.classList.contains('open'),
+      initType: typeof window.initSyncDeckImageLightbox,
+    };
+  });
+
+  expect(legacyResult).toEqual({
+    opened: true,
+    closed: true,
+    initType: 'function',
+  });
 });
 
 test('strips chalkboard storage and emits an explicit warning', async ({ page }) => {

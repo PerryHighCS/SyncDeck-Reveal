@@ -44,3 +44,60 @@ div.boardhandle > ul > li {
 		display: none!important; 
 	}
 }
+
+.img-zoomable {
+  cursor: zoom-in;
+}
+
+#img-modal,
+.syncdeck-image-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+}
+
+#img-modal.open,
+.syncdeck-image-lightbox.open {
+  display: flex;
+}
+
+#img-modal-img,
+.syncdeck-image-lightbox__image {
+  box-sizing: border-box;
+  max-width: 90vw;
+  max-height: 88vh;
+  padding: 10px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.6);
+  cursor: default;
+}
+
+#img-modal-close,
+.syncdeck-image-lightbox__close {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 36px;
+  line-height: 1;
+  opacity: 0.72;
+  cursor: pointer;
+}
+
+#img-modal-close:hover,
+#img-modal-close:focus-visible,
+.syncdeck-image-lightbox__close:hover,
+.syncdeck-image-lightbox__close:focus-visible {
+  opacity: 1;
+}

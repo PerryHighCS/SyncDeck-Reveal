@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "eslint reveal-iframe-sync.js reveal-storyboard.js syncdeck-bootstrap.js src rollup.config.mjs scripts test",
+    "lint": "eslint reveal-iframe-sync.js reveal-storyboard.js syncdeck-bootstrap.js syncdeck-image-lightbox.js src rollup.config.mjs scripts test",
     "test": "npm run lint && node scripts/run-playwright.mjs",
     "test:headed": "node scripts/run-playwright.mjs --headed",
     "build": "node scripts/build-runtime.mjs",
