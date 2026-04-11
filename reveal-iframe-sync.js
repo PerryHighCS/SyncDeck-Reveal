@@ -37,6 +37,7 @@
     studentCanNavigateBack: true,
     studentCanNavigateForward: false,
     activityPreloadLookaheadSlides: 2,
+    lastFragmentIndicator: true,
   };
 
   function normalizeOrigin(origin) {

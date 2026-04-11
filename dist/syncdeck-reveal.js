@@ -8506,6 +8506,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       studentCanNavigateBack: true,
       studentCanNavigateForward: false,
       activityPreloadLookaheadSlides: 2,
+      lastFragmentIndicator: true,
     };
 
     function normalizeOrigin(origin) {
