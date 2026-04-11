@@ -19,6 +19,7 @@ test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
     bootstrapInitType: typeof window.initSyncDeckReveal,
     buildLaunchUrlType: typeof window.buildSyncDeckLaunchUrl,
     launchPresentationType: typeof window.launchPresentationInSyncDeck,
+    imageLightboxInitType: typeof window.initSyncDeckImageLightbox,
   }));
 
   expect(globals.revealLoaded).toBe(true);
@@ -29,6 +30,7 @@ test('bundle exposes the public SyncDeck runtime globals', async ({ page }) => {
   expect(globals.bootstrapInitType).toBe('function');
   expect(globals.buildLaunchUrlType).toBe('function');
   expect(globals.launchPresentationType).toBe('function');
+  expect(globals.imageLightboxInitType).toBe('function');
 });
 
 test('preserves custom plugins while appending required SyncDeck plugins', async ({ page }) => {
@@ -124,6 +126,219 @@ test('logs and contains async afterInit callback rejections', async ({ page }) =
 
   expect(result.initRejected).toBe(false);
   expect(result.errors.some((line) => line.includes('afterInit callback failed'))).toBe(true);
+});
+
+test('installs the shared image lightbox with delegated clicks and legacy globals', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+
+  await expect(page.locator('#img-modal')).toHaveAttribute('aria-hidden', 'true');
+  await page.locator('.img-zoomable').first().evaluate((image) => image.click());
+  await expect(page.locator('#img-modal')).toHaveClass(/open/);
+  await expect(page.locator('#img-modal')).toHaveAttribute('aria-hidden', 'false');
+  await expect(page.locator('#img-modal-img')).toHaveAttribute('alt', 'Fixture zoom target');
+
+  const imageFrameStyle = await page.locator('#img-modal-img').evaluate((image) => {
+    const style = window.getComputedStyle(image);
+    return {
+      backgroundColor: style.backgroundColor,
+      boxSizing: style.boxSizing,
+      paddingTop: style.paddingTop,
+    };
+  });
+  expect(imageFrameStyle).toEqual({
+    backgroundColor: 'rgb(255, 255, 255)',
+    boxSizing: 'border-box',
+    paddingTop: '10px',
+  });
+
+  await page.locator('#img-modal-img').evaluate((image) => image.click());
+  await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
+
+  await page.locator('.img-zoomable').first().evaluate((image) => image.click());
+  await expect(page.locator('#img-modal')).toHaveClass(/open/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
+
+  const legacyResult = await page.evaluate(() => {
+    window.openImgModal('legacy-preview.png', 'Legacy preview');
+    const modal = document.getElementById('img-modal');
+    const image = document.getElementById('img-modal-img');
+    const opened = modal.classList.contains('open') && image.getAttribute('alt') === 'Legacy preview';
+    window.closeImgModal();
+    return {
+      opened,
+      closed: !modal.classList.contains('open'),
+      initType: typeof window.initSyncDeckImageLightbox,
+    };
+  });
+
+  expect(legacyResult).toEqual({
+    opened: true,
+    closed: true,
+    initType: 'function',
+  });
+});
+
+test('moves focus into the lightbox and restores it on close', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+  const focusState = await page.evaluate(() => {
+    const trigger = document.createElement('button');
+    trigger.id = 'lightbox-focus-trigger';
+    trigger.type = 'button';
+    trigger.textContent = 'Focus trigger';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    document.querySelector('.img-zoomable').click();
+    const focusedAfterOpen = document.activeElement && document.activeElement.id;
+    window.closeImgModal();
+
+    return {
+      focusedAfterOpen,
+      focusedAfterClose: document.activeElement && document.activeElement.id,
+    };
+  });
+
+  expect(focusState).toEqual({
+    focusedAfterOpen: 'img-modal-close',
+    focusedAfterClose: 'lightbox-focus-trigger',
+  });
+});
+
+test('does not rebind Escape listener when opening an already open lightbox', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+  const listenerState = await page.evaluate(() => {
+    const originalAddEventListener = document.addEventListener.bind(document);
+    const originalRemoveEventListener = document.removeEventListener.bind(document);
+    let keydownAdds = 0;
+    let keydownRemoves = 0;
+
+    document.addEventListener = function (type, listener, options) {
+      if (type === 'keydown') keydownAdds += 1;
+      return originalAddEventListener(type, listener, options);
+    };
+    document.removeEventListener = function (type, listener, options) {
+      if (type === 'keydown') keydownRemoves += 1;
+      return originalRemoveEventListener(type, listener, options);
+    };
+
+    window.openImgModal('first-preview.png', 'First preview');
+    window.openImgModal('second-preview.png', 'Second preview');
+    const image = document.getElementById('img-modal-img');
+    const openedAlt = image.alt;
+    window.closeImgModal();
+
+    document.addEventListener = originalAddEventListener;
+    document.removeEventListener = originalRemoveEventListener;
+
+    return {
+      keydownAdds,
+      keydownRemoves,
+      openedAlt,
+    };
+  });
+
+  expect(listenerState).toEqual({
+    keydownAdds: 1,
+    keydownRemoves: 1,
+    openedAlt: 'Second preview',
+  });
+});
+
+test('destroys the shared image lightbox when disabled during reinit', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  await page.evaluate(() => window.runBootstrapHarness());
+  const disabledState = await page.evaluate(async () => {
+    window.openImgModal('disable-reinit.png', 'Disable reinit');
+    await window.runBootstrapHarness({ imageLightbox: false });
+
+    const modal = document.getElementById('img-modal');
+    const image = document.getElementById('img-modal-img');
+    document.querySelector('.img-zoomable').click();
+
+    return {
+      controllerCleared: !window.__syncdeckImageLightboxController,
+      open: modal.classList.contains('open'),
+      ariaHidden: modal.getAttribute('aria-hidden'),
+      src: image.getAttribute('src'),
+      alt: image.alt,
+    };
+  });
+
+  expect(disabledState).toEqual({
+    controllerCleared: true,
+    open: false,
+    ariaHidden: 'true',
+    src: null,
+    alt: '',
+  });
+});
+
+test('keeps legacy open modal state dismissible during init and reinit', async ({ page }) => {
+  await page.goto(fixtureUrl.toString());
+
+  const initializedOpenState = await page.evaluate(() => {
+    const modal = document.createElement('div');
+    modal.id = 'img-modal';
+    modal.className = 'open';
+    const image = document.createElement('img');
+    image.id = 'img-modal-img';
+    image.src = 'legacy-open.png';
+    image.alt = 'Legacy open';
+    modal.appendChild(image);
+    document.body.appendChild(modal);
+    window.initSyncDeckImageLightbox();
+    return modal.getAttribute('aria-hidden');
+  });
+
+  expect(initializedOpenState).toBe('false');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
+  await expect(page.locator('#img-modal')).toHaveAttribute('aria-hidden', 'true');
+
+  const reinitState = await page.evaluate(() => {
+    window.openImgModal('reinit-open.png', 'Reinit open');
+    const previousController = window.__syncdeckImageLightboxController;
+    const unboundDestroy = previousController.destroy;
+    unboundDestroy();
+    const modal = document.getElementById('img-modal');
+    const image = document.getElementById('img-modal-img');
+    const stateAfterUnboundDestroy = {
+      open: modal.classList.contains('open'),
+      ariaHidden: modal.getAttribute('aria-hidden'),
+      src: image.getAttribute('src'),
+      alt: image.alt,
+      globalCleared: !window.__syncdeckImageLightboxController,
+    };
+
+    window.openImgModal('after-reinit.png', 'After reinit');
+    const reopened = modal.classList.contains('open') && image.alt === 'After reinit';
+    window.closeImgModal();
+    return {
+      stateAfterUnboundDestroy,
+      reopened,
+      closed: !modal.classList.contains('open'),
+    };
+  });
+
+  expect(reinitState).toEqual({
+    stateAfterUnboundDestroy: {
+      open: false,
+      ariaHidden: 'true',
+      src: null,
+      alt: '',
+      globalCleared: true,
+    },
+    reopened: true,
+    closed: true,
+  });
 });
 
 test('strips chalkboard storage and emits an explicit warning', async ({ page }) => {

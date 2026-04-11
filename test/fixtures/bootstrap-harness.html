@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SyncDeck Bootstrap Harness</title>
+  <link rel="stylesheet" href="../../dist/syncdeck-reveal.css">
 </head>
 <body>
   <div class="reveal">
@@ -14,7 +15,13 @@
       <button class="navigate-down" type="button" aria-label="Down"></button>
     </aside>
     <div class="slides">
-      <section><h2>Intro</h2></section>
+      <section>
+        <h2>Intro</h2>
+        <img
+          class="img-zoomable"
+          src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80'%3E%3Crect width='120' height='80' fill='%2300aaff'/%3E%3C/svg%3E"
+          alt="Fixture zoom target">
+      </section>
       <section>
         <section><h2>Stack A</h2></section>
         <section><h2>Stack B</h2></section>
@@ -158,6 +165,7 @@
             plugins: opts.includeCustomPlugins ? customPlugins : undefined,
           },
           chalkboardOverrides: opts.chalkboardOverrides || {},
+          imageLightbox: opts.imageLightbox,
           standaloneHosting: opts.standaloneHosting ? Object.assign({}, opts.standaloneHosting, {
             navigate: function (url) {
               window.__bootstrapHarness.launchCalls.push(String(url));

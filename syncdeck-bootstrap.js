@@ -587,6 +587,17 @@
       });
     }
 
+    if (cfg.imageLightbox === false) {
+      if (
+        global.__syncdeckImageLightboxController &&
+        typeof global.__syncdeckImageLightboxController.destroy === 'function'
+      ) {
+        global.__syncdeckImageLightboxController.destroy();
+      }
+    } else if (typeof global.initSyncDeckImageLightbox === 'function') {
+      global.initSyncDeckImageLightbox();
+    }
+
     if (typeof afterInit === 'function') {
       if (initResult && typeof initResult.then === 'function') {
         initResult.then(
