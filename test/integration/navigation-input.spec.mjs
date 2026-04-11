@@ -2345,7 +2345,8 @@ test('instructor sees a last-fragment cue and fragment boundary API updates', as
   });
 
   const cue = page.locator('[data-syncdeck-fragment-boundary-cue="true"]');
-  await expect(cue).toBeHidden();
+  await expect(cue).toBeVisible();
+  await expect(cue).toHaveAttribute('data-syncdeck-complete', 'false');
 
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
@@ -2362,6 +2363,7 @@ test('instructor sees a last-fragment cue and fragment boundary API updates', as
   });
 
   await expect(cue).toBeVisible();
+  await expect(cue).toHaveAttribute('data-syncdeck-complete', 'true');
   await expect(page.locator('body')).toHaveAttribute('data-syncdeck-last-fragment', 'true');
 
   const lastFragmentEvent = await page.evaluate(() => window.__fragmentBoundaryEvents.at(-1));

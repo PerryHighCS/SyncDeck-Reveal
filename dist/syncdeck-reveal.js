@@ -8674,9 +8674,9 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         width: 45px;
         height: 12px;
         background:
-          radial-gradient(circle, #f2c94c 0 3px, rgba(0, 0, 0, 0.82) 3.5px 4.5px, rgba(255, 255, 255, 0.9) 5px 5.8px, transparent 6.2px)
+          radial-gradient(circle, rgba(0, 0, 0, 0.82) 0 3.2px, rgba(255, 255, 255, 0.92) 3.7px 5.2px, transparent 5.7px)
           0 50% / 15px 12px repeat-x;
-        filter: drop-shadow(0 0 6px rgba(242, 201, 76, 0.45));
+        filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.42));
         opacity: 0;
         visibility: hidden;
         transform: translateY(2px);
@@ -8689,6 +8689,12 @@ Please report this to https://github.com/markedjs/marked.`, r) {
         opacity: 1;
         visibility: visible;
         transform: translateY(0);
+      }
+
+      .syncdeck-fragment-boundary-cue[data-syncdeck-complete="true"] {
+        background:
+          radial-gradient(circle, #f2c94c 0 3px, rgba(0, 0, 0, 0.82) 3.5px 4.5px, rgba(255, 255, 255, 0.9) 5px 5.8px, transparent 6.2px)
+          0 50% / 15px 12px repeat-x;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -9110,7 +9116,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       const detail = buildFragmentBoundaryPayload(ctx);
       const indicatorEnabled = ctx.config.lastFragmentIndicator !== false;
       const shouldShowCue = indicatorEnabled
-        && detail.atLastFragment;
+        && detail.hasFragments;
       const cue = indicatorEnabled ? ensureFragmentBoundaryCue(ctx) : ctx.state.fragmentBoundaryCueEl;
 
       document.body?.setAttribute('data-syncdeck-fragment-boundary', detail.atLastFragment ? 'last' : 'none');
@@ -9118,6 +9124,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
       if (cue) {
         cue.setAttribute('data-syncdeck-visible', shouldShowCue ? 'true' : 'false');
+        cue.setAttribute('data-syncdeck-complete', detail.atLastFragment ? 'true' : 'false');
         cue.setAttribute('aria-hidden', 'true');
       }
 
