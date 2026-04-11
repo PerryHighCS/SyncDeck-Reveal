@@ -633,7 +633,6 @@
     cue.setAttribute('data-syncdeck-fragment-boundary-cue', 'true');
     cue.setAttribute('data-syncdeck-visible', 'false');
     cue.setAttribute('aria-hidden', 'true');
-    cue.setAttribute('title', 'Next advances slide');
     document.body.appendChild(cue);
     ctx.state.fragmentBoundaryCueEl = cue;
     return cue;
