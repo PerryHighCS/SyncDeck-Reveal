@@ -11104,7 +11104,7 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       }
 
       function onModalClick(event) {
-        if (event.target === modal) close();
+        if (event.target === modal || event.target === image) close();
       }
 
       function onKeydown(event) {

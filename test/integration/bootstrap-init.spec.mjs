@@ -153,6 +153,11 @@ test('installs the shared image lightbox with delegated clicks and legacy global
     paddingTop: '10px',
   });
 
+  await page.locator('#img-modal-img').evaluate((image) => image.click());
+  await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
+
+  await page.locator('.img-zoomable').first().evaluate((image) => image.click());
+  await expect(page.locator('#img-modal')).toHaveClass(/open/);
   await page.keyboard.press('Escape');
   await expect(page.locator('#img-modal')).not.toHaveClass(/open/);
 
