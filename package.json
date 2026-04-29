@@ -16,7 +16,7 @@
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.59.1",
     "eslint": "^10.1.0",
     "globals": "^17.4.0",
     "rollup": "^4.52.5",
