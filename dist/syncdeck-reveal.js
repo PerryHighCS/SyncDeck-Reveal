@@ -8905,10 +8905,15 @@ Please report this to https://github.com/markedjs/marked.`, r) {
       }
 
       const resolvedIndices = normalizeIndices(indices);
+      const explicitInstanceKey = slide.getAttribute('data-activity-instance-key');
+      const instanceKey = typeof explicitInstanceKey === 'string' && explicitInstanceKey.trim() !== ''
+        ? explicitInstanceKey.trim()
+        : `${activityId.trim()}:${resolvedIndices.h}:${resolvedIndices.v}`;
+
       return {
         activityId: activityId.trim(),
         indices: resolvedIndices,
-        instanceKey: `${activityId.trim()}:${resolvedIndices.h}:${resolvedIndices.v}`,
+        instanceKey,
         activityOptions: parseActivityOptions(slide.getAttribute('data-activity-options')),
         trigger: normalizeActivityTrigger(slide.getAttribute('data-activity-trigger')),
       };
@@ -11089,6 +11094,10 @@ Please report this to https://github.com/markedjs/marked.`, r) {
 
       if (config.autoAnnounceReady) {
         announceReady(ctx, 'init');
+        emitActivityRequestForCurrentSlide(ctx);
+        const preloadPayload = buildFutureActivityPreloadPayload(ctx);
+        emitActivityPreloadRequest(ctx, preloadPayload);
+        emitActivityBundlePreloadRequest(ctx, preloadPayload);
       }
 
       return api;

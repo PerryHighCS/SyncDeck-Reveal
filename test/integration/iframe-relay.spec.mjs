@@ -300,6 +300,80 @@ test.describe('iframe host relay behavior', () => {
     });
   });
 
+  test('host receives activityRequest for hosted standalone slide navigation', async ({ page }) => {
+    await gotoHost(page);
+
+    await clearHostMessages(page);
+    await postCommand(page, 'slide', { h: 2, v: 0, f: 0 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityRequest'));
+
+    const messages = await hostMessages(page);
+    const activityRequest = findMessage(messages, 'activityRequest');
+    expect(activityRequest?.data?.role).toBe('standalone');
+    expect(activityRequest?.data?.payload).toEqual({
+      activityId: 'quiz-check',
+      indices: { h: 2, v: 0, f: 0 },
+      instanceKey: 'quiz-check:2:0',
+      activityOptions: { attempt: 'warmup' },
+      trigger: 'slide-enter',
+    });
+  });
+
+  test('host receives initial standalone activity preload on startup', async ({ page }) => {
+    await gotoHost(page);
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => (
+      entry.data?.action === 'activityPreloadRequest'
+        && entry.data?.role === 'standalone'
+        && entry.data?.payload?.indices?.h === 0
+    )));
+
+    const messages = await hostMessages(page);
+    const preloadRequest = findLastMessage(messages, 'activityPreloadRequest');
+    expect(preloadRequest?.data?.payload).toEqual({
+      indices: { h: 0, v: 0, f: -1 },
+      lookaheadSlides: 2,
+      requests: [
+        {
+          activityId: 'video-sync',
+          indices: { h: 1, v: 0, f: -1 },
+          instanceKey: 'video-sync:1:0',
+          activityOptions: { mode: 'conversion-smoke' },
+          trigger: 'slide-enter',
+          stackRequests: [
+            {
+              activityId: 'raffle',
+              indices: { h: 1, v: 1, f: -1 },
+              instanceKey: 'raffle:1:1',
+              activityOptions: { cohort: 'b' },
+              trigger: 'slide-enter',
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test('activityRequest honors explicit activity instance keys', async ({ page }) => {
+    await gotoHost(page);
+
+    await page.evaluate(() => {
+      const frame = document.getElementById('deck-frame');
+      const slide = frame?.contentDocument?.querySelector('.reveal .slides > section[data-activity-id="quiz-check"]');
+      slide?.setAttribute('data-activity-instance-key', 'quiz-check:stable-author-key');
+    });
+
+    await clearHostMessages(page);
+    await postCommand(page, 'slide', { h: 2, v: 0, f: 0 });
+
+    await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => entry.data?.action === 'activityRequest'));
+
+    const messages = await hostMessages(page);
+    const activityRequest = findMessage(messages, 'activityRequest');
+    expect(activityRequest?.data?.payload?.instanceKey).toBe('quiz-check:stable-author-key');
+  });
+
   test('host receives stack activityRequest payloads for vertical activity slides', async ({ page }) => {
     await gotoHost(page);
 
