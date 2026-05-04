@@ -321,6 +321,16 @@ test.describe('iframe host relay behavior', () => {
   });
 
   test('host receives initial standalone activity preload on startup', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__syncHarnessConfig = {
+        revealOptions: {
+          iframeSync: {
+            autoAnnounceReady: true,
+          },
+        },
+      };
+    });
+
     await gotoHost(page);
 
     await page.waitForFunction(() => window.__hostHarness.getMessages().some((entry) => (
