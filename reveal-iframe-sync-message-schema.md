@@ -46,6 +46,50 @@ This launch flow is intentionally separate from the iframe `postMessage` protoco
 documented below. Once the standalone session loads the presentation iframe, the normal
 `reveal-sync` message schema applies unchanged.
 
+### Mode Switching: Instructor Launch And Permalinks
+
+Beyond the default student/solo launch above, static site generators (such as the
+`Presentations` repo's `scripts/generate-site-indexes.mjs`) may offer two additional
+entry points per presentation. Both reuse the same `presentationUrl` contract; neither
+requires the static host to call ActiveBits APIs directly or handle CORS.
+
+**Instructor management launch** (ephemeral session, create+configure+redirect) —
+**confirmed contract**, already reflected in the `syncdeck` skill docs:
+
+```text
+https://bits.mycode.run/util/syncdeck/launch-presentation?presentationUrl=<encoded-absolute-url>&mode=instructor
+```
+
+- Same route as the default student launch, with `mode=instructor` added.
+- Omitting `mode` (or any value other than `instructor`) preserves today's default
+  behavior: create+configure, then redirect to the standalone student session at
+  `/<sessionId>`.
+- With `mode=instructor`, ActiveBits should still create+configure a new session, but
+  redirect to the instructor management UI at `/manage/syncdeck/<sessionId>`
+  instead.
+- This session is ephemeral: a new `sessionId` is minted on every launch, so the
+  resulting URL is not meant to be shared as a durable classroom link.
+
+**Permanent permalink** (teacherCode-gated, reusable link) — **not yet built**. The
+underlying `/api/syncdeck/generate-url` API exists, but the friendly wrapper page below
+is a new route this contract asks ActiveBits to add so static hosts never call the API
+or collect `teacherCode` directly:
+
+```text
+https://bits.mycode.run/util/syncdeck/permalink?presentationUrl=<encoded-absolute-url>
+```
+
+- ActiveBits owns this page entirely, including collecting the instructor's
+  `teacherCode` (at least 6 characters) and calling its own `/api/syncdeck/generate-url`
+  endpoint (`activityName: 'syncdeck'`, `selectedOptions: { presentationUrl }`).
+- The static presentation host only needs to link to this route with `presentationUrl`
+  set; it does not prompt for `teacherCode` or call the API itself.
+- The resulting permalink (`/activity/syncdeck/<hash>?presentationUrl=...&entryPolicy=instructor-required&urlHash=...`)
+  is stable and reusable across sessions/dates. ActiveBits should present it with a
+  copy-to-clipboard control on its own page. The same URL doubles as the student join
+  link: `entryPolicy=instructor-required` means students who open it before the
+  instructor starts the session should see a waiting state rather than an error.
+
 ## Envelope (all messages)
 
 ```json
